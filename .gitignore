@@ -1,0 +1,33 @@
+# Compiled Go binaries (built locally with `go build`)
+keyservice/keyservice
+demo/demo
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go test & coverage artifacts
+*.test
+*.out
+coverage.txt
+
+# Dependency caches (we use go modules, not vendoring)
+vendor/
+
+# Go workspace files (local-only, not for the repo)
+go.work
+go.work.sum
+
+# Environment files — never commit secrets
+.env
+.env.local
+*.env
+
+# macOS junk
+.DS_Store
+
+# Editor temp files
+.idea/
+.vscode/
+*.swp
+*.swo
