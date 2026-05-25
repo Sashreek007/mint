@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mint · API Key & Quota Service · Design</title>
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --bg-elev: #131825;
+      --bg-deep: #060a14;
+      --border: #1f2937;
+      --text: #e6edf3;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-warm: #f78166;
+      --good: #7ee787;
+      --warn: #f1c40f;
+      --bad: #f85149;
+      --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.6;
+      font-size: 16px;
+    }
+
+    nav.topnav {
+      position: sticky; top: 0;
+      background: rgba(10, 14, 26, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      padding: 14px 24px;
+      display: flex; gap: 20px; align-items: center;
+    }
+    nav.topnav .brand {
+      font-weight: 700; letter-spacing: -0.02em;
+      color: var(--accent); font-size: 17px;
+      margin-right: auto;
+      font-family: var(--mono);
+    }
+    nav.topnav a {
+      color: var(--text-dim); text-decoration: none;
+      font-size: 13px; transition: color 0.15s;
+    }
+    nav.topnav a:hover { color: var(--text); }
+
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 24px 96px;
+    }
+    section { margin-bottom: 96px; scroll-margin-top: 80px; }
+    section h2 {
+      font-size: 32px; letter-spacing: -0.02em;
+      margin-bottom: 8px; font-weight: 700;
+    }
+    section h2 .num {
+      color: var(--text-dim); font-weight: 400;
+      margin-right: 14px; font-family: var(--mono);
+      font-size: 24px;
+    }
+    section .lede {
+      color: var(--text-dim); font-size: 16px;
+      margin-bottom: 32px; max-width: 720px;
+    }
+
+    /* Hero */
+    .hero { padding: 64px 0 32px; border-bottom: 1px solid var(--border); margin-bottom: 64px; }
+    .hero h1 {
+      font-size: 56px; letter-spacing: -0.04em;
+      line-height: 1.05; font-weight: 700; margin-bottom: 20px;
+    }
+    .hero h1 .accent {
+      background: linear-gradient(135deg, var(--accent), var(--accent-warm));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p { color: var(--text-dim); font-size: 18px; max-width: 720px; }
+    .hero .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 16px; margin-top: 36px;
+    }
+    .stat {
+      background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: 10px; padding: 18px;
+    }
+    .stat .v {
+      font-size: 26px; font-weight: 700;
+      color: var(--accent); font-family: var(--mono);
+      letter-spacing: -0.02em;
+    }
+    .stat .l {
+      color: var(--text-dim); font-size: 11px;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-top: 6px;
+    }
+
+    /* Architecture */
+    .arch-wrap {
+      background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px;
+    }
+    .arch-svg { width: 100%; height: auto; display: block; }
+    .arch-svg .node rect {
+      fill: var(--bg-deep); stroke: var(--border);
+      stroke-width: 1.5; transition: all 0.18s; cursor: pointer;
+    }
+    .arch-svg .node:hover rect { stroke: var(--accent); fill: #15203a; }
+    .arch-svg .node.selected rect {
+      stroke: var(--accent); fill: #15203a; stroke-width: 2.5;
+    }
+    .arch-svg .node text {
+      fill: var(--text); font-family: var(--sans);
+      font-size: 14px; font-weight: 600; pointer-events: none;
+      text-anchor: middle;
+    }
+    .arch-svg .node text.sub {
+      fill: var(--text-dim); font-size: 11px;
+      font-weight: 400; font-family: var(--mono);
+    }
+    .arch-svg .arrow {
+      stroke: var(--text-dim); stroke-width: 1.5;
+      fill: none;
+    }
+    .arch-svg .arrow-label {
+      fill: var(--text-dim); font-family: var(--mono);
+      font-size: 10px; text-anchor: middle;
+    }
+
+    .arch-detail {
+      margin-top: 16px; padding: 20px;
+      background: var(--bg-deep); border: 1px solid var(--border);
+      border-radius: 8px; min-height: 140px;
+      transition: border-color 0.2s;
+    }
+    .arch-detail.has-selection { border-color: var(--accent); }
+    .arch-detail h4 { color: var(--accent); margin-bottom: 10px; font-size: 16px; }
+    .arch-detail p { color: var(--text-dim); }
+    .arch-detail .placeholder { color: var(--text-dim); font-style: italic; }
+    .arch-detail ul { margin: 12px 0 0 18px; color: var(--text-dim); }
+    .arch-detail ul li { margin-bottom: 4px; }
+
+    /* Hot path */
+    .hp-wrap {
+      background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px;
+    }
+    .hp-controls { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; }
+    button.btn {
+      background: var(--accent); color: var(--bg-deep);
+      border: none; padding: 9px 18px; border-radius: 6px;
+      font-weight: 600; cursor: pointer; font-family: inherit;
+      font-size: 13px; transition: opacity 0.15s;
+    }
+    button.btn:hover { opacity: 0.88; }
+    button.btn.secondary {
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border);
+    }
+    button.btn.secondary:hover { border-color: var(--text-dim); }
+    #hp-svg { width: 100%; height: auto; display: block; }
+
+    .latency-budget {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+    .lat-row {
+      display: flex; justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--bg-deep); border: 1px solid var(--border);
+      border-radius: 6px; font-family: var(--mono); font-size: 13px;
+    }
+    .lat-row .v { color: var(--accent); }
+    .lat-row.total {
+      border-color: var(--accent); background: #15203a;
+    }
+
+    /* Decisions */
+    .decisions { display: grid; gap: 12px; }
+    .decision {
+      background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: 8px; overflow: hidden;
+      transition: border-color 0.18s;
+    }
+    .decision[open] { border-color: var(--accent); }
+    .decision summary {
+      padding: 16px 20px; cursor: pointer; list-style: none;
+      display: flex; align-items: center; gap: 14px;
+      font-weight: 600; font-size: 15px;
+    }
+    .decision summary::-webkit-details-marker { display: none; }
+    .decision summary::before {
+      content: "→"; color: var(--accent);
+      transition: transform 0.2s; font-family: var(--mono);
+    }
+    .decision[open] summary::before { transform: rotate(90deg); }
+    .decision .pill {
+      margin-left: auto;
+      background: var(--bg-deep); color: var(--good);
+      font-size: 11px; font-family: var(--mono);
+      padding: 4px 10px; border-radius: 99px;
+      border: 1px solid var(--border);
+    }
+    .decision .body { padding: 0 20px 20px; color: var(--text-dim); }
+    .decision .body h5 {
+      color: var(--text); margin-top: 14px; margin-bottom: 4px;
+      font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .decision .body code {
+      background: var(--bg-deep); padding: 2px 6px;
+      border-radius: 4px; font-family: var(--mono);
+      font-size: 0.88em; border: 1px solid var(--border);
+      color: var(--accent);
+    }
+
+    /* Glossary */
+    .glossary-search {
+      width: 100%; max-width: 420px; padding: 11px 14px;
+      background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text);
+      font-family: inherit; font-size: 14px; margin-bottom: 20px;
+      transition: border-color 0.15s;
+    }
+    .glossary-search:focus { outline: none; border-color: var(--accent); }
+    .terms {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .term {
+      background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px 16px;
+      transition: border-color 0.15s;
+    }
+    .term:hover { border-color: var(--text-dim); }
+    .term .t {
+      font-family: var(--mono); font-weight: 600;
+      color: var(--accent); font-size: 13px;
+    }
+    .term .d { font-size: 13px; color: var(--text-dim); margin-top: 6px; }
+    .glossary-empty { color: var(--text-dim); font-style: italic; padding: 16px 0; }
+
+    /* Progress / chunks */
+    .progress-bar {
+      width: 100%; height: 8px;
+      background: var(--bg-elev); border-radius: 4px;
+      overflow: hidden; margin-bottom: 8px;
+      border: 1px solid var(--border);
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-warm));
+      transition: width 0.5s;
+    }
+    .progress-label {
+      font-family: var(--mono); font-size: 12px;
+      color: var(--text-dim); margin-bottom: 24px;
+    }
+    .chunks { display: grid; gap: 10px; }
+    .chunk {
+      background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: 8px; padding: 14px 18px;
+      display: flex; gap: 16px; align-items: center;
+    }
+    .chunk .num {
+      font-family: var(--mono); font-size: 14px;
+      color: var(--text-dim); min-width: 36px; font-weight: 600;
+    }
+    .chunk.done .num { color: var(--good); }
+    .chunk.active .num { color: var(--accent); }
+    .chunk .body { flex: 1; }
+    .chunk .title { font-weight: 600; font-size: 14px; }
+    .chunk .desc {
+      color: var(--text-dim); font-size: 12px;
+      margin-top: 2px; font-weight: 400;
+    }
+    .chunk .status {
+      font-family: var(--mono); font-size: 10px;
+      padding: 4px 10px; border-radius: 99px;
+      background: var(--bg-deep); border: 1px solid var(--border);
+      color: var(--text-dim); text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .chunk.done .status { color: var(--good); border-color: var(--good); }
+    .chunk.active .status { color: var(--accent); border-color: var(--accent); }
+
+    footer {
+      padding: 32px 24px; text-align: center;
+      color: var(--text-dim); font-size: 12px;
+      border-top: 1px solid var(--border);
+      margin-top: 64px; font-family: var(--mono);
+    }
+    code.inline {
+      background: var(--bg-elev); padding: 2px 6px;
+      border-radius: 4px; font-family: var(--mono);
+      font-size: 0.88em; border: 1px solid var(--border);
+      color: var(--accent);
+    }
+
+    @media (max-width: 640px) {
+      .hero h1 { font-size: 36px; }
+      nav.topnav { gap: 12px; overflow-x: auto; }
+      nav.topnav a { font-size: 12px; white-space: nowrap; }
+      section h2 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <span class="brand">mint</span>
+    <a href="#overview">Overview</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#hot-path">Hot Path</a>
+    <a href="#decisions">Decisions</a>
+    <a href="#glossary">Glossary</a>
+    <a href="#progress">Progress</a>
+  </nav>
+
+  <main>
+    <section id="overview" class="hero">
+      <h1>API key &amp; quota service —<br><span class="accent">designed for the hot path</span></h1>
+      <p>A Go service that issues, validates, and meters API keys for other backend services. Optimized for the single request type that matters: <code class="inline">POST /v1/validate</code>, called on every incoming request to every downstream service.</p>
+
+      <div class="stats">
+        <div class="stat"><div class="v">5k</div><div class="l">target rps</div></div>
+        <div class="stat"><div class="v">&lt;20ms</div><div class="l">p99 latency</div></div>
+        <div class="stat"><div class="v">99.9%</div><div class="l">reads on hot path</div></div>
+        <div class="stat"><div class="v">3</div><div class="l">core components</div></div>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <h2><span class="num">01</span>Architecture</h2>
+      <p class="lede">Three components, each with one job. Click any box to see what it does and why it is there.</p>
+
+      <div class="arch-wrap">
+        <svg class="arch-svg" viewBox="0 0 800 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Architecture diagram">
+          <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L9,3 z" fill="#8b949e"/>
+            </marker>
+          </defs>
+
+          <g class="node" data-id="downstream">
+            <rect x="30" y="40" width="170" height="70" rx="8"/>
+            <text x="115" y="70">Downstream</text>
+            <text x="115" y="90" class="sub">other backends</text>
+          </g>
+          <path class="arrow" d="M 200 75 L 280 75" marker-end="url(#arrowhead)"/>
+          <text class="arrow-label" x="240" y="66">/validate</text>
+
+          <g class="node" data-id="nginx">
+            <rect x="280" y="40" width="150" height="70" rx="8"/>
+            <text x="355" y="70">nginx</text>
+            <text x="355" y="90" class="sub">load balancer</text>
+          </g>
+          <path class="arrow" d="M 430 60 L 510 30" marker-end="url(#arrowhead)"/>
+          <path class="arrow" d="M 430 90 L 510 120" marker-end="url(#arrowhead)"/>
+
+          <g class="node" data-id="keyservice">
+            <rect x="510" y="0" width="170" height="60" rx="8"/>
+            <text x="595" y="26">keyservice</text>
+            <text x="595" y="46" class="sub">replica 1 (stateless)</text>
+          </g>
+          <g class="node" data-id="keyservice">
+            <rect x="510" y="90" width="170" height="60" rx="8"/>
+            <text x="595" y="116">keyservice</text>
+            <text x="595" y="136" class="sub">replica 2 (stateless)</text>
+          </g>
+
+          <path class="arrow" d="M 595 150 L 400 240" marker-end="url(#arrowhead)"/>
+          <text class="arrow-label" x="490" y="190">~1ms</text>
+          <path class="arrow" d="M 595 150 L 595 240" marker-end="url(#arrowhead)"/>
+          <text class="arrow-label" x="610" y="200">cache miss only</text>
+
+          <g class="node" data-id="redis">
+            <rect x="300" y="240" width="200" height="100" rx="8"/>
+            <text x="400" y="272">Redis</text>
+            <text x="400" y="294" class="sub">cache · counters · buckets</text>
+            <text x="400" y="314" class="sub">~100k ops/sec</text>
+          </g>
+
+          <g class="node" data-id="postgres">
+            <rect x="510" y="240" width="200" height="100" rx="8"/>
+            <text x="610" y="272">Postgres</text>
+            <text x="610" y="294" class="sub">source of truth</text>
+            <text x="610" y="314" class="sub">tenants · keys · rollups</text>
+          </g>
+        </svg>
+
+        <div class="arch-detail" id="arch-detail">
+          <p class="placeholder">Click a component to learn about it.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="hot-path">
+      <h2><span class="num">02</span>The Hot Path</h2>
+      <p class="lede">What happens when <code class="inline">/validate</code> is called. This runs 5,000 times per second — every other design choice serves this flow.</p>
+
+      <div class="hp-wrap">
+        <div class="hp-controls">
+          <button class="btn" id="animate">▶ Animate request</button>
+          <button class="btn secondary" id="reset">Reset</button>
+        </div>
+
+        <svg id="hp-svg" viewBox="0 0 800 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Validate request flow">
+          <defs>
+            <marker id="arr2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L9,3 z" fill="#8b949e"/>
+            </marker>
+          </defs>
+
+          <g class="hp-step" data-step="1">
+            <rect x="20" y="50" width="140" height="70" rx="8" fill="#060a14" stroke="#1f2937" stroke-width="1.5"/>
+            <text x="90" y="80" fill="#e6edf3" font-size="13" font-weight="600" text-anchor="middle">1. Request</text>
+            <text x="90" y="100" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="middle">X-API-Key header</text>
+          </g>
+
+          <path class="hp-arrow" d="M 160 85 L 220 85" stroke="#8b949e" stroke-width="1.5" fill="none" marker-end="url(#arr2)" data-step="2"/>
+
+          <g class="hp-step" data-step="2">
+            <rect x="220" y="50" width="140" height="70" rx="8" fill="#060a14" stroke="#1f2937" stroke-width="1.5"/>
+            <text x="290" y="80" fill="#e6edf3" font-size="13" font-weight="600" text-anchor="middle">2. HMAC</text>
+            <text x="290" y="100" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="middle">key → key_hash</text>
+          </g>
+
+          <path class="hp-arrow" d="M 360 85 L 420 85" stroke="#8b949e" stroke-width="1.5" fill="none" marker-end="url(#arr2)" data-step="3"/>
+
+          <g class="hp-step" data-step="3">
+            <rect x="420" y="50" width="180" height="70" rx="8" fill="#060a14" stroke="#1f2937" stroke-width="1.5"/>
+            <text x="510" y="80" fill="#e6edf3" font-size="13" font-weight="600" text-anchor="middle">3. Redis Lua</text>
+            <text x="510" y="100" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="middle">cache + rate + usage</text>
+          </g>
+
+          <path class="hp-arrow" d="M 600 85 L 660 85" stroke="#8b949e" stroke-width="1.5" fill="none" marker-end="url(#arr2)" data-step="4"/>
+
+          <g class="hp-step" data-step="4">
+            <rect x="660" y="50" width="140" height="70" rx="8" fill="#060a14" stroke="#1f2937" stroke-width="1.5"/>
+            <text x="730" y="80" fill="#e6edf3" font-size="13" font-weight="600" text-anchor="middle">4. Response</text>
+            <text x="730" y="100" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="middle">200 · 401 · 429</text>
+          </g>
+        </svg>
+
+        <div class="latency-budget">
+          <div class="lat-row"><span>Network in</span><span class="v">~2ms</span></div>
+          <div class="lat-row"><span>HMAC + parse</span><span class="v">&lt;1ms</span></div>
+          <div class="lat-row"><span>Redis Lua (1 round-trip)</span><span class="v">~3ms</span></div>
+          <div class="lat-row"><span>Response + network out</span><span class="v">~2ms</span></div>
+          <div class="lat-row total"><span>p50 total</span><span class="v">~8ms</span></div>
+          <div class="lat-row total"><span>p99 budget</span><span class="v">&lt;20ms</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="decisions">
+      <h2><span class="num">03</span>Design Decisions</h2>
+      <p class="lede">The six questions every system like this has to answer. Click each to see the tradeoff and our pick.</p>
+
+      <div class="decisions">
+        <details class="decision">
+          <summary>Key hashing — Argon2id vs HMAC<span class="pill">HMAC-SHA256 + pepper</span></summary>
+          <div class="body">
+            <h5>Tradeoff</h5>
+            <p>Argon2id is slow and memory-hard — perfect for passwords, where you need to make brute force expensive. But API keys already carry 32 bytes of entropy, so brute force is infeasible regardless of hash speed. At 5k rps, Argon2id (~100ms per hash) would melt the CPU.</p>
+            <h5>Pick — HMAC-SHA256 with a server-side pepper</h5>
+            <p>Microsecond-fast, deterministic (so we can index <code>key_hash</code> in Postgres), and the pepper means a database leak alone is not enough for an attacker to verify candidate keys.</p>
+          </div>
+        </details>
+
+        <details class="decision">
+          <summary>Rate limit algorithm<span class="pill">Token bucket via Redis Lua</span></summary>
+          <div class="body">
+            <h5>Options</h5>
+            <p><strong>Fixed window</strong> is simple but has a 2× burst at window boundaries. <strong>Sliding window log</strong> is precise but memory-heavy. <strong>Token bucket</strong> allows controlled bursts — which is what real APIs need.</p>
+            <h5>Pick — Token bucket via Redis Lua script</h5>
+            <p>Industry standard (AWS, Stripe, GitHub). Tiny state per key: <code>{tokens, last_refill_ts}</code>. Lua makes the check + decrement atomic in one round-trip.</p>
+          </div>
+        </details>
+
+        <details class="decision">
+          <summary>Usage pipeline<span class="pill">Redis INCR + batch flush</span></summary>
+          <div class="body">
+            <h5>The math</h5>
+            <p>5,000 rps × 86,400 = ~430M events/day. Writing every event to Postgres = 5k writes/sec sustained. Postgres could do it, but it is wasteful.</p>
+            <h5>Pick — Redis INCR on the hot path, background flusher every 30–60s</h5>
+            <p>Hot path adds one Redis op (essentially free). Flusher reads <code>usage:{tenant}:{key}:{minute}</code> keys and writes one row per minute into Postgres. Drops write rate from 5k/sec to ~10/sec — a 500× reduction. Idempotent via <code>INSERT ... ON CONFLICT</code>.</p>
+          </div>
+        </details>
+
+        <details class="decision">
+          <summary>Rate limit vs daily quota<span class="pill">Two mechanisms</span></summary>
+          <div class="body">
+            <h5>Why separate</h5>
+            <p>Rate limit = burst protection (e.g. 100 req/sec, rolling). Quota = billing &amp; fairness (e.g. 1M req/month, calendar-aligned). Different time scales, different semantics, different consistency requirements.</p>
+            <h5>Pick — Token bucket for rate limit, simple counter for quota</h5>
+            <p>Both checks happen in the same Lua script, so it is still one Redis round-trip on the hot path.</p>
+          </div>
+        </details>
+
+        <details class="decision">
+          <summary>p99 latency budget<span class="pill">p50 10ms · p99 20ms</span></summary>
+          <div class="body">
+            <h5>The breakdown</h5>
+            <p>Network in (1–2ms) + HMAC (&lt;1ms) + Redis Lua (2–4ms) + response (1–2ms) = ~6–8ms p50, ~15ms p99. 20ms p99 is comfortable.</p>
+            <h5>Critical optimization</h5>
+            <p>Pipeline all Redis ops into a single Lua call. Cache lookup, rate check, quota check, usage increment in one round-trip. This is the difference between hitting and missing the budget.</p>
+          </div>
+        </details>
+
+        <details class="decision">
+          <summary>Rotation grace period<span class="pill">48h overlap + force</span></summary>
+          <div class="body">
+            <h5>Tradeoff</h5>
+            <p>Tenants need time to update deployments after rotating a key. Immediate cutoff breaks them. Infinite grace makes rotation meaningless.</p>
+            <h5>Pick — 48-hour overlap by default, <code>force=true</code> for immediate revoke</h5>
+            <p>Normal rotation gives a calm migration window. <code>force=true</code> handles the leaked-key compromise case.</p>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <section id="glossary">
+      <h2><span class="num">04</span>Glossary</h2>
+      <p class="lede">Every term used in this doc, in one place. Filter as you type.</p>
+
+      <input class="glossary-search" id="glossary-search" placeholder="Filter terms (e.g. cache, atomic, hot path)..." />
+
+      <div class="terms" id="terms"></div>
+      <p class="glossary-empty" id="glossary-empty" style="display:none;">No matches.</p>
+    </section>
+
+    <section id="progress">
+      <h2><span class="num">05</span>Implementation Progress</h2>
+      <p class="lede">Where we are in the build. Each chunk is a small, self-contained learning step.</p>
+
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-label" id="progress-label"></div>
+
+      <div class="chunks" id="chunks"></div>
+    </section>
+  </main>
+
+  <footer>
+    mint · design doc · single-file HTML artifact
+  </footer>
+
+  <script>
+    // ---------- Architecture details ----------
+    const archDetails = {
+      downstream: {
+        title: "Downstream services",
+        body: "Other backend services in the company — the consumers of our auth. Each one calls POST /v1/validate on every incoming request to check that the caller's API key is real, not revoked, and not over its rate limit.",
+        bullets: [
+          "If keyservice is down, they are down — we are tier-0.",
+          "They speak to us through nginx, never directly to a replica.",
+          "Eventually, they will import the keyservice-go middleware so the validate call is one line of Go for them."
+        ]
+      },
+      nginx: {
+        title: "nginx — load balancer",
+        body: "Sits in front of the keyservice replicas and distributes incoming requests across them. Round-robin by default — every replica is equivalent because the service is stateless.",
+        bullets: [
+          "Also performs /healthz checks: a replica that fails is removed from the rotation.",
+          "Trivially scalable: bump replica count in docker-compose with a single number change.",
+          "In production this role is played by an AWS ALB, GCP load balancer, or similar."
+        ]
+      },
+      keyservice: {
+        title: "keyservice — the Go HTTP service",
+        body: "Stateless, horizontally scalable Go service. Holds nothing in memory between requests. Each request talks to Redis (and rarely Postgres). Two replicas locally; six-plus in production with autoscaling.",
+        bullets: [
+          "Statelessness is the property that lets us add replicas freely.",
+          "Built as a static binary (CGO_ENABLED=0) and shipped in a ~22MB Alpine image.",
+          "Runs as a non-root user inside the container."
+        ]
+      },
+      redis: {
+        title: "Redis — the hot-path accelerator",
+        body: "In-memory key-value store. Plays three roles simultaneously: (1) cache of key → tenant lookups, (2) rate-limit token buckets, (3) usage counters waiting to be flushed.",
+        bullets: [
+          "~1ms per op, ~100k ops/sec per node. 20× headroom over our 5k rps target.",
+          "All validate-path operations are bundled into a single Lua script — one network round-trip.",
+          "If Redis dies: degrade gracefully — fall back to Postgres for auth, skip rate limiting."
+        ]
+      },
+      postgres: {
+        title: "Postgres — the source of truth",
+        body: "Authoritative data: tenants, api_keys (with key_hash), usage rollups. Hit only on cache miss and admin writes — not on the hot path.",
+        bullets: [
+          "Cache hit rate stays near 100% with 5-minute TTL, so Postgres rarely sees validate traffic.",
+          "Usage flusher uses INSERT ... ON CONFLICT for idempotent batch upserts.",
+          "Schema is small and structured — classic relational fit."
+        ]
+      }
+    };
+
+    function renderArchDetail(d) {
+      const el = document.getElementById('arch-detail');
+      el.classList.add('has-selection');
+      const bullets = d.bullets.map(b => `<li>${b}</li>`).join('');
+      el.innerHTML = `<h4>${d.title}</h4><p>${d.body}</p><ul>${bullets}</ul>`;
+    }
+
+    document.querySelectorAll('.arch-svg .node').forEach(node => {
+      node.addEventListener('click', () => {
+        const id = node.dataset.id;
+        document.querySelectorAll('.arch-svg .node').forEach(n => n.classList.remove('selected'));
+        document.querySelectorAll(`.arch-svg .node[data-id="${id}"]`).forEach(n => n.classList.add('selected'));
+        renderArchDetail(archDetails[id]);
+      });
+    });
+
+    // ---------- Hot path animation ----------
+    const steps = document.querySelectorAll('.hp-step');
+    const arrows = document.querySelectorAll('.hp-arrow');
+
+    function resetHotpath() {
+      steps.forEach(s => {
+        const r = s.querySelector('rect');
+        r.setAttribute('stroke', '#1f2937');
+        r.setAttribute('fill', '#060a14');
+      });
+      arrows.forEach(a => a.setAttribute('stroke', '#8b949e'));
+    }
+
+    function highlight(el) {
+      if (el.tagName === 'g') {
+        const r = el.querySelector('rect');
+        r.setAttribute('stroke', '#58a6ff');
+        r.setAttribute('fill', '#15203a');
+      } else {
+        el.setAttribute('stroke', '#58a6ff');
+      }
+    }
+
+    document.getElementById('animate').addEventListener('click', async () => {
+      resetHotpath();
+      const sequence = [
+        document.querySelector('.hp-step[data-step="1"]'),
+        document.querySelector('.hp-arrow[data-step="2"]'),
+        document.querySelector('.hp-step[data-step="2"]'),
+        document.querySelector('.hp-arrow[data-step="3"]'),
+        document.querySelector('.hp-step[data-step="3"]'),
+        document.querySelector('.hp-arrow[data-step="4"]'),
+        document.querySelector('.hp-step[data-step="4"]'),
+      ];
+      for (const el of sequence) {
+        highlight(el);
+        await new Promise(r => setTimeout(r, 450));
+      }
+    });
+
+    document.getElementById('reset').addEventListener('click', resetHotpath);
+
+    // ---------- Glossary ----------
+    const terms = [
+      { t: "Hot path", d: "Code that runs on every request. Must be optimized." },
+      { t: "Stateless", d: "Service holds no data between requests; state lives elsewhere." },
+      { t: "Horizontal scaling", d: "Add more copies of the service to handle more load." },
+      { t: "Load balancer", d: "Distributes incoming requests across service copies." },
+      { t: "Source of truth", d: "The authoritative data store. For us, Postgres." },
+      { t: "Cache", d: "A fast, in-memory copy of data to avoid hitting the source of truth." },
+      { t: "TTL", d: "Time-to-live. How long a cached item lives before being deleted." },
+      { t: "Cache hit / miss", d: "Whether the cache had the data (hit) or had to fall back (miss)." },
+      { t: "p99 latency", d: "Response time at the 99th percentile. Tail latency users feel." },
+      { t: "Throughput", d: "Requests handled per second." },
+      { t: "Tier-0 dependency", d: "A service whose failure takes down everything depending on it." },
+      { t: "HMAC", d: "Fast keyed hash function. Deterministic. Used to hash API keys." },
+      { t: "Atomic", d: "An operation that fully happens or fully does not." },
+      { t: "Lua script (Redis)", d: "Small program that runs inside Redis atomically, in one round-trip." },
+      { t: "Token bucket", d: "Rate-limit algorithm: bucket of tokens, refills over time." },
+      { t: "Idempotent", d: "Running twice has the same effect as running once. Safe to retry." },
+      { t: "Write amplification", d: "One logical op causing many physical writes. Fix with batching." },
+      { t: "Sharding", d: "Splitting data across machines for scalability." },
+      { t: "Entropy", d: "Randomness measured in bits. 256 bits = uncrackable." },
+      { t: "Salt", d: "Per-record random data added before hashing. Stops rainbow tables." },
+      { t: "Pepper", d: "Single secret stored outside the database. Stops DB-leak brute force." },
+      { t: "Fail open / closed", d: "On dependency failure: let traffic through (open) or reject (closed)." },
+      { t: "Round-trip", d: "One full request+response cycle. Each one costs ~1ms over a network." },
+      { t: "Pipeline", d: "Sending multiple commands in one round-trip instead of one at a time." },
+      { t: "GC pause", d: "Garbage collector pause. Causes occasional p99/p99.9 latency spikes." },
+      { t: "Availability zone (AZ)", d: "Physically isolated data center within a cloud region." },
+      { t: "N+1 redundancy", d: "Run one more replica than the minimum needed for capacity." },
+      { t: "Autoscaling", d: "Cloud auto-adds/removes replicas based on metrics." },
+      { t: "Rolling deployment", d: "Replace replicas gradually so the service stays available during deploys." },
+      { t: "Webhook", d: "Service makes an HTTP call out to a customer instead of customer polling." },
+      { t: "Pub/sub", d: "Messaging pattern. Publish event, subscribers get notified." },
+      { t: "I/O-bound", d: "Bottleneck is waiting on network/disk, not CPU." },
+      { t: "Container", d: "Isolated, reproducible runtime environment for a single process." },
+      { t: "Image vs container", d: "Image = frozen blueprint. Container = running instance." },
+      { t: "Multi-stage build", d: "Build in one image, ship only the artifact in a smaller one." },
+      { t: "Layer caching", d: "Each Dockerfile instruction is a cached layer. Order matters." },
+      { t: "Static binary", d: "Self-contained executable, no external library deps. CGO_ENABLED=0." },
+      { t: ".gitignore", d: "File listing patterns git should never track. Add before first commit." },
+      { t: ".dockerignore", d: "Files excluded from the Docker build context. Smaller, safer builds." },
+      { t: "Port mapping", d: "Bridge between a host port and a container port (e.g. -p 8080:8080)." },
+      { t: "ENTRYPOINT", d: "Dockerfile instruction: the command run when the container starts." }
+    ];
+
+    const termsEl = document.getElementById('terms');
+    const emptyEl = document.getElementById('glossary-empty');
+
+    function renderTerms(filter = '') {
+      const f = filter.toLowerCase().trim();
+      const visible = terms.filter(t =>
+        t.t.toLowerCase().includes(f) || t.d.toLowerCase().includes(f)
+      );
+      termsEl.innerHTML = visible
+        .map(t => `<div class="term"><div class="t">${t.t}</div><div class="d">${t.d}</div></div>`)
+        .join('');
+      emptyEl.style.display = visible.length === 0 ? 'block' : 'none';
+    }
+    renderTerms();
+
+    document.getElementById('glossary-search').addEventListener('input', e => {
+      renderTerms(e.target.value);
+    });
+
+    // ---------- Chunks / progress ----------
+    const chunks = [
+      { n: 'A1', title: 'Bare Go HTTP server with /healthz', desc: 'Standard-library-only main.go on port 8080.', status: 'done' },
+      { n: 'A2', title: 'Multi-stage Dockerfile', desc: '~22MB final image. Alpine runtime, non-root user, CA certs.', status: 'done' },
+      { n: 'A3', title: 'docker-compose with Postgres + Redis + nginx', desc: 'Two keyservice replicas behind nginx. One command brings the stack up.', status: 'next' },
+      { n: 'B', title: 'Tenants — schema and CRUD', desc: 'Postgres migrations, tenants table, admin-protected endpoint.', status: 'todo' },
+      { n: 'C', title: 'API key issuance', desc: 'Generate, HMAC-hash, store. POST /v1/tenants/{id}/keys.', status: 'todo' },
+      { n: 'D', title: '/validate slow path', desc: 'Postgres-only validation. Proves the contract before adding cache.', status: 'todo' },
+      { n: 'E', title: 'Redis cache layer', desc: 'Cache key lookups with TTL; invalidate on rotate/revoke.', status: 'todo' },
+      { n: 'F', title: 'Rate limiting', desc: 'Token bucket in Redis Lua. Integrate into /validate.', status: 'todo' },
+      { n: 'G', title: 'Usage metering', desc: 'Counter increment + background flusher to Postgres rollups.', status: 'todo' },
+      { n: 'H', title: 'Observability', desc: 'slog, /metrics (Prometheus), /healthz vs /readyz.', status: 'todo' },
+      { n: 'I', title: 'keyservice-go middleware', desc: 'Drop-in package for other Go backends.', status: 'todo' },
+      { n: 'J', title: 'Demo product + integration tests', desc: 'End-to-end walkthrough, testcontainers-go.', status: 'todo' }
+    ];
+
+    const chunksEl = document.getElementById('chunks');
+    chunksEl.innerHTML = chunks.map(c => `
+      <div class="chunk ${c.status === 'done' ? 'done' : c.status === 'next' ? 'active' : ''}">
+        <div class="num">${c.n}</div>
+        <div class="body">
+          <div class="title">${c.title}</div>
+          <div class="desc">${c.desc}</div>
+        </div>
+        <div class="status">${c.status === 'done' ? '✓ done' : c.status === 'next' ? '→ next' : 'todo'}</div>
+      </div>
+    `).join('');
+
+    const doneCount = chunks.filter(c => c.status === 'done').length;
+    const pct = Math.round((doneCount / chunks.length) * 100);
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-label').textContent = `${doneCount} / ${chunks.length} chunks complete · ${pct}%`;
+  </script>
+</body>
+</html>

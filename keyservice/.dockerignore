@@ -1,0 +1,16 @@
+# Files that should never enter the Docker build context.
+# Keeps builds fast and prevents accidentally baking junk into the image.
+
+Dockerfile
+.dockerignore
+*.md
+
+# Local build artifacts (in case anyone runs `go build` locally)
+keyservice
+*.exe
+
+# Editor / OS junk
+.DS_Store
+.idea/
+.vscode/
+*.swp
