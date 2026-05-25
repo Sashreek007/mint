@@ -1,24 +1,25 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
-	"fmt"
 	"os"
 )
 
 func main() {
-	//HOSTNAME is automatically set by docker in every container to the containers short id 
-	
+	//HOSTNAME is automatically set by docker in every container to the containers short id
+
 	replicaID := os.Getenv("HOSTNAME")
-	if replicaID == ""{
+	if replicaID == "" {
 		replicaID = "local"
+	}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{"status":"ok","replica":"%s"}`, replicaID)
+		fmt.Fprintf(w, `{"status":"ok","replica":"%s"}`+"\n", replicaID)
 	})
 
 	addr := ":8080"
