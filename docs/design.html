@@ -250,6 +250,34 @@
     .term .d { font-size: 13px; color: var(--text-dim); margin-top: 6px; }
     .glossary-empty { color: var(--text-dim); font-style: italic; padding: 16px 0; }
 
+    /* Chunk-wise glossary structure */
+    .chunk-lesson { margin-bottom: 44px; }
+    .chunk-lesson:last-child { margin-bottom: 0; }
+    .chunk-lesson-title {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 18px; font-weight: 600;
+      margin-bottom: 6px; color: var(--text);
+      letter-spacing: -0.01em;
+    }
+    .chunk-tag {
+      font-family: var(--mono); font-size: 11px; font-weight: 700;
+      color: var(--accent); background: var(--bg-elev);
+      border: 1px solid var(--border);
+      padding: 4px 10px; border-radius: 6px;
+      letter-spacing: 0.08em;
+    }
+    .chunk-subhead {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+      color: var(--text-dim); margin: 20px 0 10px;
+      font-family: var(--mono);
+    }
+    .term.optim { border-color: rgba(126, 231, 135, 0.28); }
+    .term.optim .t { color: var(--good); }
+    .term.optim::before {
+      content: "↑ "; color: var(--good);
+      font-weight: 700; font-family: var(--mono);
+    }
+
     /* Progress / chunks */
     .progress-bar {
       width: 100%; height: 8px;
@@ -532,11 +560,11 @@
 
     <section id="glossary">
       <h2><span class="num">04</span>Glossary</h2>
-      <p class="lede">Every term used in this doc, in one place. Filter as you type.</p>
+      <p class="lede">Concepts, terms, and optimizations grouped by the chunk where we learned them. Filter as you type.</p>
 
-      <input class="glossary-search" id="glossary-search" placeholder="Filter terms (e.g. cache, atomic, hot path)..." />
+      <input class="glossary-search" id="glossary-search" placeholder="Filter (e.g. cache, tcp, nginx, keep-alive)..." />
 
-      <div class="terms" id="terms"></div>
+      <div id="glossary-content"></div>
       <p class="glossary-empty" id="glossary-empty" style="display:none;">No matches.</p>
     </section>
 
@@ -663,76 +691,141 @@
 
     document.getElementById('reset').addEventListener('click', resetHotpath);
 
-    // ---------- Glossary ----------
-    const terms = [
-      { t: "Hot path", d: "Code that runs on every request. Must be optimized." },
-      { t: "Stateless", d: "Service holds no data between requests; state lives elsewhere." },
-      { t: "Horizontal scaling", d: "Add more copies of the service to handle more load." },
-      { t: "Load balancer", d: "Distributes incoming requests across service copies." },
-      { t: "Source of truth", d: "The authoritative data store. For us, Postgres." },
-      { t: "Cache", d: "A fast, in-memory copy of data to avoid hitting the source of truth." },
-      { t: "TTL", d: "Time-to-live. How long a cached item lives before being deleted." },
-      { t: "Cache hit / miss", d: "Whether the cache had the data (hit) or had to fall back (miss)." },
-      { t: "p99 latency", d: "Response time at the 99th percentile. Tail latency users feel." },
-      { t: "Throughput", d: "Requests handled per second." },
-      { t: "Tier-0 dependency", d: "A service whose failure takes down everything depending on it." },
-      { t: "HMAC", d: "Fast keyed hash function. Deterministic. Used to hash API keys." },
-      { t: "Atomic", d: "An operation that fully happens or fully does not." },
-      { t: "Lua script (Redis)", d: "Small program that runs inside Redis atomically, in one round-trip." },
-      { t: "Token bucket", d: "Rate-limit algorithm: bucket of tokens, refills over time." },
-      { t: "Idempotent", d: "Running twice has the same effect as running once. Safe to retry." },
-      { t: "Write amplification", d: "One logical op causing many physical writes. Fix with batching." },
-      { t: "Sharding", d: "Splitting data across machines for scalability." },
-      { t: "Entropy", d: "Randomness measured in bits. 256 bits = uncrackable." },
-      { t: "Salt", d: "Per-record random data added before hashing. Stops rainbow tables." },
-      { t: "Pepper", d: "Single secret stored outside the database. Stops DB-leak brute force." },
-      { t: "Fail open / closed", d: "On dependency failure: let traffic through (open) or reject (closed)." },
-      { t: "Round-trip", d: "One full request+response cycle. Each one costs ~1ms over a network." },
-      { t: "Pipeline", d: "Sending multiple commands in one round-trip instead of one at a time." },
-      { t: "GC pause", d: "Garbage collector pause. Causes occasional p99/p99.9 latency spikes." },
-      { t: "Availability zone (AZ)", d: "Physically isolated data center within a cloud region." },
-      { t: "N+1 redundancy", d: "Run one more replica than the minimum needed for capacity." },
-      { t: "Autoscaling", d: "Cloud auto-adds/removes replicas based on metrics." },
-      { t: "Rolling deployment", d: "Replace replicas gradually so the service stays available during deploys." },
-      { t: "Webhook", d: "Service makes an HTTP call out to a customer instead of customer polling." },
-      { t: "Pub/sub", d: "Messaging pattern. Publish event, subscribers get notified." },
-      { t: "I/O-bound", d: "Bottleneck is waiting on network/disk, not CPU." },
-      { t: "Container", d: "Isolated, reproducible runtime environment for a single process." },
-      { t: "Image vs container", d: "Image = frozen blueprint. Container = running instance." },
-      { t: "Multi-stage build", d: "Build in one image, ship only the artifact in a smaller one." },
-      { t: "Layer caching", d: "Each Dockerfile instruction is a cached layer. Order matters." },
-      { t: "Static binary", d: "Self-contained executable, no external library deps. CGO_ENABLED=0." },
-      { t: ".gitignore", d: "File listing patterns git should never track. Add before first commit." },
-      { t: ".dockerignore", d: "Files excluded from the Docker build context. Smaller, safer builds." },
-      { t: "Port mapping", d: "Bridge between a host port and a container port (e.g. -p 8080:8080)." },
-      { t: "ENTRYPOINT", d: "Dockerfile instruction: the command run when the container starts." }
+    // ---------- Glossary, grouped by chunk ----------
+    const chunkLessons = [
+      {
+        chunk: "A1",
+        title: "Bare Go HTTP server",
+        concepts: [
+          { t: "Hot path", d: "Code that runs on every request. Must be optimized." },
+          { t: "Stateless", d: "Service holds no data between requests; state lives in Redis or Postgres." },
+          { t: "Tier-0 dependency", d: "A service whose failure takes down every service depending on it." },
+          { t: "/healthz", d: "The 'are you alive' endpoint every backend exposes. Used by LBs and orchestrators." },
+          { t: "Go module", d: "Unit of versioning in Go. Declared by go.mod. Path matches where the code lives." },
+          { t: "package main", d: "Special Go package that produces an executable rather than a library." },
+          { t: "ServeMux", d: "Go's built-in HTTP router. Maps URL patterns to handler functions." },
+          { t: "Handler signature", d: "func(w http.ResponseWriter, r *http.Request) — the shape of every Go HTTP handler." },
+          { t: "io.Writer", d: "Go interface for anything that can be written to. ResponseWriter satisfies it." },
+          { t: "Method-prefixed patterns", d: "Go 1.22+ syntax like 'GET /healthz' — auto method matching, no manual if checks." },
+          { t: "Standard library", d: "Modules shipped with the language. Zero dependencies = a feature, not a limitation." },
+          { t: "fmt.Fprintln vs Fprintf", d: "Fprintf processes %s placeholders; Fprintln just concatenates arguments." },
+          { t: "Raw vs interpreted strings", d: "Backticks `...` do not process escapes; quotes \"...\" do." }
+        ],
+        optimizations: []
+      },
+      {
+        chunk: "A2",
+        title: "Docker image · multi-stage build",
+        concepts: [
+          { t: "Container", d: "Isolated, reproducible runtime environment for a single process." },
+          { t: "Image vs container", d: "Image = frozen blueprint. Container = running instance." },
+          { t: "Multi-stage build", d: "Build in one image, ship only the artifact in a smaller one." },
+          { t: "Layer caching", d: "Each Dockerfile instruction becomes a cached layer. Order matters for cache reuse." },
+          { t: "Static binary", d: "Self-contained executable with no external library deps." },
+          { t: "CGO_ENABLED=0", d: "Disable C bindings during build. Produces a fully static Go binary." },
+          { t: "Alpine Linux", d: "Tiny Linux distro (~5 MB) designed for containers. Uses musl libc." },
+          { t: "Non-root user", d: "Run containers as unprivileged user. Defense in depth." },
+          { t: "Port mapping", d: "Bridge from a host port to a container port (-p HOST:CONTAINER)." },
+          { t: "ENTRYPOINT", d: "Dockerfile instruction: the command run when the container starts." },
+          { t: ".dockerignore", d: "Files excluded from the Docker build context. Smaller, safer, faster builds." },
+          { t: ".gitignore", d: "File listing patterns git should never track. Add before your first commit." }
+        ],
+        optimizations: [
+          { t: "Multi-stage build", d: "Final image dropped from ~800 MB to ~22 MB by discarding the Go toolchain after compiling." },
+          { t: "Layer-aware COPY order", d: "Copy go.mod first, run go mod download, then copy source. Cache survives source edits — only dep changes bust the download layer." },
+          { t: "-ldflags='-s -w'", d: "Strip symbol table and DWARF debug info from the Go binary. ~25% smaller binary." }
+        ]
+      },
+      {
+        chunk: "A3",
+        title: "docker-compose · load testing · nginx tuning",
+        concepts: [
+          { t: "docker-compose", d: "YAML file describing a multi-service stack. One command brings everything up." },
+          { t: "Service discovery (Docker DNS)", d: "Inside a compose network, the service name resolves to all running replicas of that service." },
+          { t: "Named volume", d: "Docker-managed persistent storage. Survives container restarts. Wiped by 'down -v'." },
+          { t: "depends_on / service_healthy", d: "Wait for a dependency's healthcheck to pass before starting." },
+          { t: "Healthcheck (CMD vs CMD-SHELL)", d: "CMD = exec form (separate args). CMD-SHELL = single string for /bin/sh -c." },
+          { t: "Reverse proxy", d: "Server that receives client requests and forwards them to backends." },
+          { t: "Upstream (nginx)", d: "A named group of backend servers in nginx config, referenced by proxy_pass." },
+          { t: "Round-robin load balancing", d: "Cycle through backends one by one. nginx's default." },
+          { t: "worker_processes", d: "How many nginx worker processes to spawn. 'auto' = one per CPU core." },
+          { t: "worker_connections", d: "Max simultaneous connections per nginx worker process. Each request to an upstream uses 2." },
+          { t: "TCP three-way handshake", d: "SYN → SYN-ACK → ACK. Required once before any HTTP data can flow." },
+          { t: "HTTP keep-alive", d: "HTTP/1.1 default: reuse the same TCP connection for multiple requests." },
+          { t: "Connection pooling", d: "Client maintains a pool of open connections and reuses them." },
+          { t: "WebSockets", d: "Persistent bidirectional channel. For server-push use cases, not request-response." },
+          { t: "Throughput", d: "Requests handled per second." },
+          { t: "p50 / p99 latency", d: "Response time at the 50th / 99th percentile. p99 is the tail users feel." },
+          { t: "Concurrency vs parallelism", d: "Concurrency = many in flight at once. Parallelism = many actually running on different cores." },
+          { t: "Little's Law", d: "Concurrency = Throughput × Latency. Tells you how many in-flight requests at any moment." },
+          { t: "Queueing under load", d: "When demand exceeds capacity, requests wait in line — latency = queue time + processing time." },
+          { t: "Saturation knee", d: "The concurrency level where latency starts climbing sharply. The practical limit." },
+          { t: "hey", d: "Go-based HTTP load testing tool. Concurrency via -c, total requests via -n." },
+          { t: "EOF error", d: "TCP connection closed before the HTTP response finished. Common symptom of overload." },
+          { t: "Diagnose before optimize", d: "Identify the bottleneck before changing anything. Defaults are not always wrong; sometimes your config is." }
+        ],
+        optimizations: [
+          { t: "Upstream HTTP keep-alive", d: "Added 'keepalive 32' to the nginx upstream block + proxy_http_version 1.1 + cleared the Connection header. Saves a TCP handshake on every nginx → keyservice hop." },
+          { t: "worker_processes auto", d: "Lets nginx spawn one worker process per CPU core (10 on this laptop) instead of the default 1." },
+          { t: "worker_connections 4096", d: "4× per-worker capacity. Combined with multi-core, lifted nginx's concurrent capacity from ~512 to ~20,000 requests." }
+        ]
+      }
     ];
 
-    const termsEl = document.getElementById('terms');
+    const glossaryEl = document.getElementById('glossary-content');
     const emptyEl = document.getElementById('glossary-empty');
 
-    function renderTerms(filter = '') {
-      const f = filter.toLowerCase().trim();
-      const visible = terms.filter(t =>
-        t.t.toLowerCase().includes(f) || t.d.toLowerCase().includes(f)
-      );
-      termsEl.innerHTML = visible
-        .map(t => `<div class="term"><div class="t">${t.t}</div><div class="d">${t.d}</div></div>`)
-        .join('');
-      emptyEl.style.display = visible.length === 0 ? 'block' : 'none';
+    function matches(item, f) {
+      return !f || item.t.toLowerCase().includes(f) || item.d.toLowerCase().includes(f);
     }
-    renderTerms();
+
+    function renderGlossary(filter = '') {
+      const f = filter.toLowerCase().trim();
+      let totalVisible = 0;
+
+      glossaryEl.innerHTML = chunkLessons.map(chunk => {
+        const concepts = chunk.concepts.filter(c => matches(c, f));
+        const opts = chunk.optimizations.filter(c => matches(c, f));
+        if (concepts.length === 0 && opts.length === 0) return '';
+        totalVisible += concepts.length + opts.length;
+
+        const conceptsBlock = concepts.length === 0 ? '' : `
+          <div class="chunk-subhead">Concepts</div>
+          <div class="terms">
+            ${concepts.map(c => `<div class="term"><div class="t">${c.t}</div><div class="d">${c.d}</div></div>`).join('')}
+          </div>`;
+
+        const optsBlock = opts.length === 0 ? '' : `
+          <div class="chunk-subhead">Optimizations applied</div>
+          <div class="terms">
+            ${opts.map(c => `<div class="term optim"><div class="t">${c.t}</div><div class="d">${c.d}</div></div>`).join('')}
+          </div>`;
+
+        return `
+          <div class="chunk-lesson">
+            <div class="chunk-lesson-title">
+              <span class="chunk-tag">${chunk.chunk}</span>
+              ${chunk.title}
+            </div>
+            ${conceptsBlock}
+            ${optsBlock}
+          </div>`;
+      }).join('');
+
+      emptyEl.style.display = totalVisible === 0 ? 'block' : 'none';
+    }
+    renderGlossary();
 
     document.getElementById('glossary-search').addEventListener('input', e => {
-      renderTerms(e.target.value);
+      renderGlossary(e.target.value);
     });
 
     // ---------- Chunks / progress ----------
     const chunks = [
       { n: 'A1', title: 'Bare Go HTTP server with /healthz', desc: 'Standard-library-only main.go on port 8080.', status: 'done' },
       { n: 'A2', title: 'Multi-stage Dockerfile', desc: '~22MB final image. Alpine runtime, non-root user, CA certs.', status: 'done' },
-      { n: 'A3', title: 'docker-compose with Postgres + Redis + nginx', desc: 'Two keyservice replicas behind nginx. One command brings the stack up.', status: 'next' },
-      { n: 'B', title: 'Tenants — schema and CRUD', desc: 'Postgres migrations, tenants table, admin-protected endpoint.', status: 'todo' },
+      { n: 'A3', title: 'docker-compose, load test, nginx tune', desc: 'Two keyservice replicas behind nginx. Verified 24k rps, p99 17ms at realistic concurrency.', status: 'done' },
+      { n: 'B', title: 'Tenants — schema and CRUD', desc: 'Postgres migrations, tenants table, admin-protected endpoint.', status: 'next' },
       { n: 'C', title: 'API key issuance', desc: 'Generate, HMAC-hash, store. POST /v1/tenants/{id}/keys.', status: 'todo' },
       { n: 'D', title: '/validate slow path', desc: 'Postgres-only validation. Proves the contract before adding cache.', status: 'todo' },
       { n: 'E', title: 'Redis cache layer', desc: 'Cache key lookups with TTL; invalidate on rotate/revoke.', status: 'todo' },
