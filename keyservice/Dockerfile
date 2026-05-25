@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1.7
 
 # ---------- Stage 1: build ----------
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /src
 
 # Copy go.mod first so dependency download caches independently of source changes.
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 # Now copy the rest of the source.
