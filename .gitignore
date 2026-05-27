@@ -31,3 +31,6 @@ go.work.sum
 .vscode/
 *.swp
 *.swo
+
+# Local-only docs (Claude Code project instructions — not for the public repo)
+CLAUDE.md

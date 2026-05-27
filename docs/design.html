@@ -769,6 +769,81 @@
           { t: "worker_processes auto", d: "Lets nginx spawn one worker process per CPU core (10 on this laptop) instead of the default 1." },
           { t: "worker_connections 4096", d: "4× per-worker capacity. Combined with multi-core, lifted nginx's concurrent capacity from ~512 to ~20,000 requests." }
         ]
+      },
+      {
+        chunk: "B",
+        title: "Tenants schema · pgx pool · admin endpoint",
+        concepts: [
+          // --- HTTP fundamentals (deepened from A1)
+          { t: "HTTP request/response", d: "Two-message protocol over TCP. Client sends one request (method, path, headers, body), server returns one response (status, headers, body). Everything else is convention on top." },
+          { t: "HTTP method", d: "Verb in the request line. POST creates, GET reads, PUT replaces at a known ID, DELETE removes. Picked by intent, not convenience." },
+          { t: "HTTP status code", d: "Three-digit response classifier. 2xx success (201 Created for new resource), 4xx client error (400 bad input, 401 unauthorized), 5xx server error (500)." },
+          { t: "ListenAndServe", d: "Go's all-in-one server loop: bind a TCP port, loop on accept(), spawn a goroutine per request, dispatch via the mux. Blocks indefinitely — main never returns." },
+          { t: "Goroutine per request", d: "Go spawns a fresh goroutine for every incoming HTTP request. Handlers run concurrently and must be safe for concurrent calls." },
+          { t: "Response write order", d: "Strict sequence: w.Header().Set(…) → w.WriteHeader(status) → write body. Once any write happens, headers lock; the status cannot be un-sent." },
+          { t: "Closure handler", d: "Anonymous function passed to mux.HandleFunc that captures outer variables like pool and adminToken — they stay alive as long as the handler does." },
+          { t: "r.Context()", d: "Per-request context. Cancels automatically if the client disconnects. Pass it to downstream calls so they abort with the client." },
+
+          // --- DB / pgx
+          { t: "DSN", d: "Data Source Name — vendor-neutral term for a connection string. postgres://user:pass@host:port/db?options. Same shape across every Postgres client." },
+          { t: "sslmode", d: "Postgres DSN option that controls TLS. disable / require / verify-full. Production is always verify-full." },
+          { t: "Connection pool", d: "Long-lived bag of pre-opened DB connections. Acquire-query-release per call. Amortizes handshake cost and caps concurrency at the pool boundary." },
+          { t: "Postgres backend process", d: "Postgres forks one OS process per connection — ~10 MB of memory each. Why opening a connection per request would destroy the database." },
+          { t: "Embedded vs server DB", d: "SQLite is embedded — the library is the engine. Postgres is a separate server reached over TCP — hence pools, auth handshakes, migrations." },
+          { t: "pgxpool.Pool", d: "pgx's connection pool type. Has Query / QueryRow / Exec methods that hide checkout-and-release of individual connections." },
+          { t: "MaxConns / MinConns", d: "Pool size cap / minimum warm idle. Sized per replica × replica count vs Postgres max_connections. We use 10 / 2." },
+          { t: "MaxConnLifetime / IdleTime", d: "Hard-rotate any connection older than lifetime; close any connection idle longer than idle time. Returns resources, refreshes state." },
+          { t: "Ping", d: "A quick SELECT 1 round-trip used at startup to prove credentials, network, and Postgres readiness all work together. Fail-fast trigger." },
+          { t: "QueryRow().Scan()", d: "Run a query expected to return exactly one row, then bind columns into Go variables via & pointers. Like Python's cur.execute + fetchone unpack." },
+          { t: "Query / Exec", d: "Query = multiple rows (iterate with rows.Next()). Exec = write that returns no rows, just a row-count command tag." },
+          { t: "Parameterized query", d: "SQL with $1, $2, … placeholders sent separately from values. Values cannot become SQL no matter the bytes — the only safe way to inline user input." },
+          { t: "SQL injection", d: "Concatenating user input into SQL lets attackers run arbitrary queries (Acme'); DROP TABLE …). Parameterized queries are the structural fix." },
+          { t: "INSERT ... RETURNING", d: "Postgres extension: INSERT returns the inserted row(s) directly. Saves the INSERT-then-SELECT round-trip on the write path." },
+          { t: "SCRAM authentication", d: "Postgres's challenge-response auth. Client proves it knows the password without ever sending it. Part of the connection handshake cost." },
+
+          // --- Migrations
+          { t: "Database migration", d: "Versioned, ordered SQL change applied exactly once per environment. Makes schema evolution reproducible across dev, CI, prod." },
+          { t: "golang-migrate", d: "Migration tool with plain .up.sql / .down.sql files numbered 0001, 0002, … Tracks state in a schema_migrations table." },
+          { t: "schema_migrations", d: "Bookkeeping table auto-created by golang-migrate. Holds the current version and a 'dirty' flag set if a migration crashed mid-way." },
+          { t: "Idempotent DDL", d: "Schema change that is safe to run multiple times with the same result — e.g. CREATE EXTENSION IF NOT EXISTS pgcrypto." },
+          { t: "pgcrypto", d: "Postgres extension providing crypto functions, including gen_random_uuid() for UUID v4 generation." },
+          { t: "UUID vs BIGSERIAL", d: "UUID = 128-bit random, unguessable, client-generatable. BIGSERIAL = auto-increment integer. UUID picked for tenants so customer count cannot be inferred from IDs." },
+          { t: "CHECK constraint", d: "Database-level validation rule (e.g. status IN ('active', 'suspended', 'deleted')). Enforced regardless of which client wrote the row." },
+          { t: "Soft delete", d: "Mark rows as logically deleted (status='deleted') instead of physically removing. Preserves audit trail and prevents cascading FK damage." },
+          { t: "TIMESTAMPTZ", d: "Timestamp with time zone — stored as UTC internally, no ambiguity. Always pick over plain TIMESTAMP for application data." },
+
+          // --- Go language / patterns
+          { t: "context.Context", d: "Go's standard mechanism for cancellation, deadlines, and request-scoped values. Conventionally the first argument to any blocking function." },
+          { t: "context.WithTimeout", d: "Wraps a parent context with a deadline. Returns the new context and a cancel func — defer cancel() always, even if the timeout fires." },
+          { t: "defer", d: "Schedules a function call to run when the enclosing function exits, regardless of how (normal return, error, panic). Couples cleanup to acquisition." },
+          { t: "if err := f(); err != nil", d: "Idiomatic Go: short statement before the condition, scoping err to the if block. Standard one-off error check." },
+          { t: "Struct tags", d: "Annotations like `json:\"name\"` after a struct field. Tell encoding/json which JSON key maps to which field." },
+          { t: "& (address-of)", d: "Operator that yields a pointer to a variable. Required by Scan and Decode so the library can write into your variable, not a copy." },
+          { t: "log.Fatal vs log.Printf", d: "Fatal logs then calls os.Exit(1) — skips all deferred calls. Use only during startup. Printf logs and returns." },
+          { t: "encoding/json Decoder/Encoder", d: "Streaming JSON in/out from io.Reader/io.Writer. NewDecoder(r.Body).Decode(&req) for input, NewEncoder(w).Encode(resp) for output." },
+
+          // --- Security
+          { t: "Timing side-channel", d: "Attack that infers a secret by measuring how long a comparison takes. String == short-circuits at the first differing byte and leaks the prefix." },
+          { t: "subtle.ConstantTimeCompare", d: "Go stdlib byte-compare whose runtime is proportional to input length, not difference position. Mandatory for comparing secrets." },
+          { t: "Fail closed vs fail open", d: "Closed = on doubt, deny (the right choice for auth). Open = on doubt, allow (the right choice for rate limiting). Pick per concern." },
+          { t: "Defense in depth", d: "Multiple independent protections so one failure does not breach the system. E.g. CHECK constraint at DB plus validation in the handler." },
+          { t: "Error message leakage", d: "Returning raw DB errors to clients exposes schema. Log the real error for operators, return a generic message to the caller." },
+
+          // --- Docker / compose new bits
+          { t: "service_completed_successfully", d: "depends_on condition that waits for a one-shot service to exit with code 0. The right way to gate keyservice on the migrate job." },
+          { t: "One-shot container", d: "Runs a single task and exits — not a long-lived service. restart: 'no' keeps Docker from restarting it." },
+          { t: "Bind mount", d: "Host directory exposed inside a container (./migrations:/migrations:ro). Live changes from the host, no rebuild needed. :ro makes it read-only." },
+          { t: "12-factor config", d: "App reads config (DATABASE_URL, ADMIN_TOKEN, …) from environment variables. The deploy environment supplies them — dev compose, K8s Secrets, etc." }
+        ],
+        optimizations: [
+          { t: "INSERT ... RETURNING", d: "Postgres returns the inserted row from the INSERT itself — one network round-trip instead of INSERT then SELECT." },
+          { t: "Parameterized SQL ($1, $2, ...)", d: "Driver sends SQL and values separately to Postgres. Closes SQL injection by construction and enables pgx's prepared-statement cache." },
+          { t: "Constant-time auth compare", d: "subtle.ConstantTimeCompare on the X-Admin-Token header — kills the timing side-channel that string == would open." },
+          { t: "Warm pool (MinConns=2)", d: "Pool keeps at least 2 connections pre-opened. Eliminates handshake latency for the first requests after an idle period." },
+          { t: "Fail-fast on startup", d: "Missing DATABASE_URL / ADMIN_TOKEN or unreachable Postgres crashes the process inside 5 seconds. Docker restarts it; misconfig is loud, not silent." },
+          { t: "Request-context to DB", d: "r.Context() is passed to pool calls. If the client disconnects mid-request, pgx aborts the in-flight Postgres query — no wasted work." },
+          { t: "One-shot migration container", d: "migrate service gated with service_completed_successfully. Fresh clone → docker compose up → schema applied before keyservice ever starts." }
+        ]
       }
     ];
 
@@ -825,8 +900,8 @@
       { n: 'A1', title: 'Bare Go HTTP server with /healthz', desc: 'Standard-library-only main.go on port 8080.', status: 'done' },
       { n: 'A2', title: 'Multi-stage Dockerfile', desc: '~22MB final image. Alpine runtime, non-root user, CA certs.', status: 'done' },
       { n: 'A3', title: 'docker-compose, load test, nginx tune', desc: 'Two keyservice replicas behind nginx. Verified 24k rps, p99 17ms at realistic concurrency.', status: 'done' },
-      { n: 'B', title: 'Tenants — schema and CRUD', desc: 'Postgres migrations, tenants table, admin-protected endpoint.', status: 'next' },
-      { n: 'C', title: 'API key issuance', desc: 'Generate, HMAC-hash, store. POST /v1/tenants/{id}/keys.', status: 'todo' },
+      { n: 'B', title: 'Tenants — schema and CRUD', desc: 'golang-migrate, pgxpool, POST /admin/tenants with X-Admin-Token auth. First persistent state.', status: 'done' },
+      { n: 'C', title: 'API key issuance', desc: 'Generate, HMAC-hash, store. POST /v1/tenants/{id}/keys.', status: 'next' },
       { n: 'D', title: '/validate slow path', desc: 'Postgres-only validation. Proves the contract before adding cache.', status: 'todo' },
       { n: 'E', title: 'Redis cache layer', desc: 'Cache key lookups with TTL; invalidate on rotate/revoke.', status: 'todo' },
       { n: 'F', title: 'Rate limiting', desc: 'Token bucket in Redis Lua. Integrate into /validate.', status: 'todo' },
