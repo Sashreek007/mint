@@ -2,16 +2,20 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -31,6 +35,11 @@ func main() {
 	if adminToken == "" {
 		log.Fatal("ADMIN_TOKEN is required")
 	}
+	keyPepper := os.Getenv("KEY_PEPPER")
+	if keyPepper == "" {
+		log.Fatal("KEY_PEPPER is required")
+	}
+
 	// Parse DSN into a pgxpool. Config and set sizing knobs
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -115,6 +124,78 @@ func main() {
 		_ = json.NewEncoder(w).Encode(tenant)
 	})
 
+	mux.HandleFunc("POST /v1/tenants/{id}/keys", func(w http.ResponseWriter, r *http.Request) {
+		// auth — same admin gate as before
+		if !authAdmin(r, adminToken) {
+			writeJSONError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+
+		// pull {id} out of the URL path
+		tenantID := r.PathValue("id")
+
+		// body: just a name
+		var req struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "invalid JSON")
+			return
+		}
+		if strings.TrimSpace(req.Name) == "" {
+			writeJSONError(w, http.StatusBadRequest, "name is required")
+			return
+		}
+
+		// generate the plaintext key, derive prefix + hash
+		fullKey, err := generateKey()
+		if err != nil {
+			log.Printf("generateKey: %v", err)
+			writeJSONError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		keyPrefix := fullKey[:20]              // "ak_live_" + first 12 random chars
+		keyHash := hashKey(keyPepper, fullKey) //  BYTEA
+
+		// insert; let Postgres validate the tenant via the FK + uuid cast
+		var id string
+		var createdAt time.Time
+		err = pool.QueryRow(r.Context(),
+			`INSERT INTO api_keys (tenant_id, name, key_prefix, key_hash)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING id, created_at`,
+			tenantID, req.Name, keyPrefix, keyHash,
+		).Scan(&id, &createdAt)
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) {
+				switch pgErr.Code {
+				case "22P02": // invalid_text_representation — {id} wasn't a UUID
+					writeJSONError(w, http.StatusBadRequest, "invalid tenant id")
+					return
+				case "23503": // foreign_key_violation — no such tenant
+					writeJSONError(w, http.StatusNotFound, "tenant not found")
+					return
+				}
+			}
+			log.Printf("insert api_key: %v", err)
+			writeJSONError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+
+		// 201 — the ONLY time the plaintext key is ever returned
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(struct {
+			ID        string    `json:"id"`
+			TenantID  string    `json:"tenant_id"`
+			Name      string    `json:"name"`
+			Key       string    `json:"key"`
+			KeyPrefix string    `json:"key_prefix"`
+			CreatedAt time.Time `json:"created_at"`
+		}{id, tenantID, req.Name, fullKey, keyPrefix, createdAt})
+	})
+
 	addr := ":8080"
 	//Binds to port 8080.
 	//Loops forever on accept().
@@ -135,4 +216,33 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	fmt.Fprintf(w, `{"error":%q}`+"\n", msg)
+}
+
+const keyAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" //base62 alphabet
+
+func generateKey() (string, error) {
+	const bodyLen = 32
+	const maxByte = 62 * 4
+
+	out := make([]byte, bodyLen)
+	buf := make([]byte, 1)
+
+	for i := 0; i < bodyLen; {
+		if _, err := rand.Read(buf); err != nil {
+			return "", err
+		}
+		if buf[0] >= maxByte {
+			continue
+		}
+		out[i] = keyAlphabet[buf[0]%62]
+		i++
+	}
+	return "ak_live_" + string(out), nil
+}
+
+// hashKey returns HMAC sha256 - 32 raw bytes for the bytea column
+func hashKey(pepper, key string) []byte {
+	mac := hmac.New(sha256.New, []byte(pepper))
+	mac.Write([]byte(key))
+	return mac.Sum(nil)
 }
