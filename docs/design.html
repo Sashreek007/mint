@@ -278,6 +278,34 @@
       font-weight: 700; font-family: var(--mono);
     }
 
+    /* ER diagram / data model */
+    .er-wrap {
+      background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: 12px; padding: 24px;
+    }
+    .er-svg { width: 100%; height: auto; display: block; }
+    .er-legend {
+      display: flex; flex-wrap: wrap; gap: 18px;
+      margin-top: 18px; padding-top: 16px;
+      border-top: 1px solid var(--border);
+      font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+    }
+    .er-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .er-legend .key {
+      font-weight: 700; padding: 1px 6px; border-radius: 4px;
+      background: var(--bg-deep); border: 1px solid var(--border);
+    }
+    .er-legend .key.pk { color: var(--accent); }
+    .er-legend .key.fk { color: var(--accent-warm); }
+    .er-legend .key.uq { color: var(--good); }
+    .er-notes { margin: 20px 0 0 18px; color: var(--text-dim); font-size: 14px; }
+    .er-notes li { margin-bottom: 8px; }
+    .er-notes code {
+      background: var(--bg-deep); padding: 2px 6px; border-radius: 4px;
+      font-family: var(--mono); font-size: 0.85em; border: 1px solid var(--border);
+      color: var(--accent);
+    }
+
     /* Progress / chunks */
     .progress-bar {
       width: 100%; height: 8px;
@@ -348,6 +376,7 @@
     <span class="brand">mint</span>
     <a href="#overview">Overview</a>
     <a href="#architecture">Architecture</a>
+    <a href="#data-model">Data Model</a>
     <a href="#hot-path">Hot Path</a>
     <a href="#decisions">Decisions</a>
     <a href="#glossary">Glossary</a>
@@ -432,8 +461,111 @@
       </div>
     </section>
 
+    <section id="data-model">
+      <h2><span class="num">02</span>Data Model</h2>
+      <p class="lede">The relational schema in Postgres. A tenant owns many API keys — a one-to-many relationship enforced by a foreign key. Tables are tagged with the chunk that introduced them.</p>
+
+      <div class="er-wrap">
+        <svg class="er-svg" viewBox="0 0 800 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Entity relationship diagram">
+          <!-- ===================== tenants ===================== -->
+          <g>
+            <!-- header -->
+            <rect x="40" y="80" width="250" height="34" rx="6" fill="#15203a" stroke="#58a6ff" stroke-width="1.5"/>
+            <text x="56" y="102" fill="#e6edf3" font-family="ui-monospace" font-size="14" font-weight="700">tenants</text>
+            <rect x="250" y="88" width="28" height="18" rx="4" fill="#060a14" stroke="#1f2937"/>
+            <text x="264" y="101" fill="#58a6ff" font-family="ui-monospace" font-size="11" font-weight="700" text-anchor="middle">B</text>
+            <!-- body -->
+            <rect x="40" y="114" width="250" height="120" fill="#060a14" stroke="#1f2937" stroke-width="1.5"/>
+            <line x1="40" y1="138" x2="290" y2="138" stroke="#1f2937"/>
+            <line x1="40" y1="162" x2="290" y2="162" stroke="#1f2937"/>
+            <line x1="40" y1="186" x2="290" y2="186" stroke="#1f2937"/>
+            <line x1="40" y1="210" x2="290" y2="210" stroke="#1f2937"/>
+            <!-- rows: name (left), type (right) -->
+            <text x="54" y="130" fill="#e6edf3" font-family="ui-monospace" font-size="12">id</text>
+            <text x="276" y="130" fill="#58a6ff" font-family="ui-monospace" font-size="11" text-anchor="end">UUID · PK</text>
+            <text x="54" y="154" fill="#e6edf3" font-family="ui-monospace" font-size="12">name</text>
+            <text x="276" y="154" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="end">TEXT</text>
+            <text x="54" y="178" fill="#e6edf3" font-family="ui-monospace" font-size="12">status</text>
+            <text x="276" y="178" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="end">TEXT · CHECK</text>
+            <text x="54" y="202" fill="#e6edf3" font-family="ui-monospace" font-size="12">created_at</text>
+            <text x="276" y="202" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="end">TIMESTAMPTZ</text>
+            <text x="54" y="226" fill="#e6edf3" font-family="ui-monospace" font-size="12">updated_at</text>
+            <text x="276" y="226" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="end">TIMESTAMPTZ</text>
+          </g>
+
+          <!-- ===================== api_keys ===================== -->
+          <g>
+            <!-- header -->
+            <rect x="510" y="30" width="260" height="34" rx="6" fill="#15203a" stroke="#f78166" stroke-width="1.5"/>
+            <text x="526" y="52" fill="#e6edf3" font-family="ui-monospace" font-size="14" font-weight="700">api_keys</text>
+            <rect x="730" y="38" width="28" height="18" rx="4" fill="#060a14" stroke="#1f2937"/>
+            <text x="744" y="51" fill="#f78166" font-family="ui-monospace" font-size="11" font-weight="700" text-anchor="middle">C</text>
+            <!-- body: 10 rows × 24 = 240 -->
+            <rect x="510" y="64" width="260" height="240" fill="#060a14" stroke="#1f2937" stroke-width="1.5"/>
+            <line x1="510" y1="88"  x2="770" y2="88"  stroke="#1f2937"/>
+            <line x1="510" y1="112" x2="770" y2="112" stroke="#1f2937"/>
+            <line x1="510" y1="136" x2="770" y2="136" stroke="#1f2937"/>
+            <line x1="510" y1="160" x2="770" y2="160" stroke="#1f2937"/>
+            <line x1="510" y1="184" x2="770" y2="184" stroke="#1f2937"/>
+            <line x1="510" y1="208" x2="770" y2="208" stroke="#1f2937"/>
+            <line x1="510" y1="232" x2="770" y2="232" stroke="#1f2937"/>
+            <line x1="510" y1="256" x2="770" y2="256" stroke="#1f2937"/>
+            <line x1="510" y1="280" x2="770" y2="280" stroke="#1f2937"/>
+            <text x="524" y="80"  fill="#e6edf3" font-family="ui-monospace" font-size="12">id</text>
+            <text x="756" y="80"  fill="#58a6ff" font-family="ui-monospace" font-size="11" text-anchor="end">UUID · PK</text>
+            <text x="524" y="104" fill="#e6edf3" font-family="ui-monospace" font-size="12">tenant_id</text>
+            <text x="756" y="104" fill="#f78166" font-family="ui-monospace" font-size="11" text-anchor="end">UUID · FK</text>
+            <text x="524" y="128" fill="#e6edf3" font-family="ui-monospace" font-size="12">name</text>
+            <text x="756" y="128" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="end">TEXT</text>
+            <text x="524" y="152" fill="#e6edf3" font-family="ui-monospace" font-size="12">key_prefix</text>
+            <text x="756" y="152" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="end">TEXT</text>
+            <text x="524" y="176" fill="#e6edf3" font-family="ui-monospace" font-size="12">key_hash</text>
+            <text x="756" y="176" fill="#7ee787" font-family="ui-monospace" font-size="11" text-anchor="end">BYTEA · UQ</text>
+            <text x="524" y="200" fill="#e6edf3" font-family="ui-monospace" font-size="12">status</text>
+            <text x="756" y="200" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="end">TEXT · CHECK</text>
+            <text x="524" y="224" fill="#e6edf3" font-family="ui-monospace" font-size="12">last_used_at</text>
+            <text x="756" y="224" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="end">TIMESTAMPTZ</text>
+            <text x="524" y="248" fill="#e6edf3" font-family="ui-monospace" font-size="12">revoked_at</text>
+            <text x="756" y="248" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="end">TIMESTAMPTZ</text>
+            <text x="524" y="272" fill="#e6edf3" font-family="ui-monospace" font-size="12">created_at</text>
+            <text x="756" y="272" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="end">TIMESTAMPTZ</text>
+            <text x="524" y="296" fill="#e6edf3" font-family="ui-monospace" font-size="12">updated_at</text>
+            <text x="756" y="296" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="end">TIMESTAMPTZ</text>
+          </g>
+
+          <!-- ===================== relationship ===================== -->
+          <!-- tenants.id (right edge x=290, row center y=126) → api_keys.tenant_id (left edge x=510, row center y=100) -->
+          <path d="M 290 126 H 400 V 100 H 510" fill="none" stroke="#8b949e" stroke-width="1.5"/>
+          <!-- "one" marker near tenants: two ticks -->
+          <line x1="300" y1="118" x2="300" y2="134" stroke="#8b949e" stroke-width="1.5"/>
+          <line x1="308" y1="118" x2="308" y2="134" stroke="#8b949e" stroke-width="1.5"/>
+          <!-- "many" crow's foot near api_keys -->
+          <line x1="498" y1="100" x2="510" y2="90"  stroke="#8b949e" stroke-width="1.5"/>
+          <line x1="498" y1="100" x2="510" y2="100" stroke="#8b949e" stroke-width="1.5"/>
+          <line x1="498" y1="100" x2="510" y2="110" stroke="#8b949e" stroke-width="1.5"/>
+          <!-- label -->
+          <text x="400" y="92" fill="#8b949e" font-family="ui-monospace" font-size="11" text-anchor="middle">owns · 1:N</text>
+        </svg>
+
+        <div class="er-legend">
+          <span><span class="key pk">PK</span> primary key</span>
+          <span><span class="key fk">FK</span> foreign key → tenants.id</span>
+          <span><span class="key uq">UQ</span> unique (indexed)</span>
+          <span>‖— one&nbsp;&nbsp;&nbsp;—&lt; many (crow's foot)</span>
+        </div>
+
+        <ul class="er-notes">
+          <li><strong>One tenant → many keys.</strong> <code>api_keys.tenant_id</code> references <code>tenants.id</code> with <code>ON DELETE RESTRICT</code> — Postgres refuses to delete a tenant that still owns keys, so credentials can never be orphaned.</li>
+          <li><strong><code>key_hash</code> is <code>BYTEA UNIQUE</code>, never the plaintext.</strong> We store the HMAC-SHA256 of the key. The <code>UNIQUE</code> constraint auto-creates the B-tree index that the <code>/validate</code> hot path will look keys up against.</li>
+          <li><strong><code>key_prefix</code> is the only human-readable hint kept.</strong> The full key is shown to the caller exactly once, at creation; the prefix lets dashboards display <code>ak_live_AbCd••••</code> afterwards.</li>
+          <li><strong>Soft delete via <code>status</code>.</strong> Keys flip to <code>revoked</code> (never hard-deleted) so <code>/validate</code> can distinguish "revoked" from "never existed", and the audit trail survives.</li>
+          <li><strong><code>last_used_at</code> is defined now but written later (Chunk G).</strong> Updating it on every request would add a Postgres write to the hot path; the usage flusher will batch it from Redis instead.</li>
+        </ul>
+      </div>
+    </section>
+
     <section id="hot-path">
-      <h2><span class="num">02</span>The Hot Path</h2>
+      <h2><span class="num">03</span>The Hot Path</h2>
       <p class="lede">What happens when <code class="inline">/validate</code> is called. This runs 5,000 times per second — every other design choice serves this flow.</p>
 
       <div class="hp-wrap">
@@ -492,7 +624,7 @@
     </section>
 
     <section id="decisions">
-      <h2><span class="num">03</span>Design Decisions</h2>
+      <h2><span class="num">04</span>Design Decisions</h2>
       <p class="lede">The six questions every system like this has to answer. Click each to see the tradeoff and our pick.</p>
 
       <div class="decisions">
@@ -559,7 +691,7 @@
     </section>
 
     <section id="glossary">
-      <h2><span class="num">04</span>Glossary</h2>
+      <h2><span class="num">05</span>Glossary</h2>
       <p class="lede">Concepts, terms, and optimizations grouped by the chunk where we learned them. Filter as you type.</p>
 
       <input class="glossary-search" id="glossary-search" placeholder="Filter (e.g. cache, tcp, nginx, keep-alive)..." />
@@ -569,7 +701,7 @@
     </section>
 
     <section id="progress">
-      <h2><span class="num">05</span>Implementation Progress</h2>
+      <h2><span class="num">06</span>Implementation Progress</h2>
       <p class="lede">Where we are in the build. Each chunk is a small, self-contained learning step.</p>
 
       <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
