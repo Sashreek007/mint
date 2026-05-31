@@ -1024,6 +1024,32 @@
           { t: "Single-round-trip validation", d: "Letting Postgres validate the tenant via the FK + uuid cast (and mapping 22P02/23503) avoids a pre-check SELECT and the TOCTOU race." },
           { t: "Layered packages + DI", d: "keys / store / api split by concern; main.go drops 248 → 70 lines of pure wiring. Each layer unit-testable in isolation; route registration centralized so the nesting bug can't recur." }
         ]
+      },
+      {
+        chunk: "D",
+        title: "/validate slow path · the hot endpoint · baseline benchmark",
+        concepts: [
+          { t: "/validate", d: "The endpoint every downstream service calls on each request to check a caller's API key. The hot path — the whole system is optimized for it." },
+          { t: "Validation = mirror of issuance", d: "Issuance: generate → hash → store. Validation: read incoming key → hash with same HMAC+pepper → look up the hash. Deterministic hashing is what makes the lookup work." },
+          { t: "Authorization: Bearer", d: "The HTTP-standard way to carry a credential (OAuth, GitHub, etc.). The caller sends 'Bearer ak_live_…'; we strip the prefix and hash the rest." },
+          { t: "strings.CutPrefix", d: "Go 1.20+ builtin returning (remainder, ok). Strips 'Bearer ' and tells us if the prefix was actually there — catches missing/garbage headers in one call." },
+          { t: "Validation-in-the-WHERE", d: "A single JOIN of api_keys to tenants with status='active' on BOTH in the WHERE clause. Revoked key, suspended tenant, or unknown key all collapse to zero rows." },
+          { t: "pgx.ErrNoRows", d: "The error QueryRow().Scan() returns when nothing matched. For validate that IS the expected 'key is bad' signal → mapped to ErrKeyNotValid (401)." },
+          { t: "Fail closed", d: "On any doubt about a credential, DENY. A wrongly-allowed request is a breach; a wrongly-denied one is just a retry. Auth always fails closed." },
+          { t: "Fail quiet", d: "A bad key gets a bare {valid:false} with no reason — telling the caller whether it was revoked vs unknown vs suspended would help an attacker." },
+          { t: "Bad key vs broken DB", d: "ErrNoRows → 401 (key is bad). Any other DB error → 500 (infrastructure failure). Never treat an outage as 'key is fine', never treat a bad key as a 500." },
+          { t: "Slow path (on purpose)", d: "Postgres-only validate, no cache. Built first to nail the contract while it's simple — correctness before speed. The cache (Chunk E) is layered onto known-correct logic." },
+          { t: "Throughput vs latency", d: "Two different axes. 'How many per second' vs 'how long each takes'. A system can have high throughput AND terrible latency (long queues) at the same time." },
+          { t: "Saturation knee", d: "The concurrency level past which adding load makes BOTH throughput and latency worse. Measured live: c=50 gave 12k rps/17ms; c=1000 gave 5k rps/1100ms." },
+          { t: "Concurrency cap as protection", d: "The connection pool (20 total) is a deliberate cap. It queues excess load at the pool boundary instead of letting it overwhelm Postgres — backpressure by design." },
+          { t: "Connection-sweet-spot rule", d: "Optimal DB connections ≈ cores × 2, not 'as many as possible'. More connections past the sweet spot fight over CPU and slow the database down." },
+          { t: "Scaling past max_connections", d: "Real fix is never 'raise the limit'. It's: PgBouncer (multiplex), read replicas (copy for reads), cache (avoid the DB), then sharding (split the data)." }
+        ],
+        optimizations: [
+          { t: "Single-JOIN validation (one round-trip)", d: "Key + tenant status checked together in one query's WHERE clause — no fetch-then-check-in-Go, no second query." },
+          { t: "Reuse keys.Hash on the hot path", d: "Validation hashes the incoming key with the exact HMAC+pepper used at issuance — microsecond cost, and it indexes straight into key_hash BYTEA UNIQUE." },
+          { t: "Baseline measured before optimizing", d: "Postgres-only /validate benchmarked first (12k rps @ p99 17ms, c=50) so Chunk E's cache has a real 'before' number to prove against. Diagnose before optimize." }
+        ]
       }
     ];
 
@@ -1082,8 +1108,8 @@
       { n: 'A3', title: 'docker-compose, load test, nginx tune', desc: 'Two keyservice replicas behind nginx. Verified 24k rps, p99 17ms at realistic concurrency.', status: 'done' },
       { n: 'B', title: 'Tenants — schema and CRUD', desc: 'golang-migrate, pgxpool, POST /admin/tenants with X-Admin-Token auth. First persistent state.', status: 'done' },
       { n: 'C', title: 'API key issuance', desc: 'crypto/rand + base62 keys, HMAC+pepper hashing, POST /v1/tenants/{id}/keys, layered into internal/ packages.', status: 'done' },
-      { n: 'D', title: '/validate slow path', desc: 'Postgres-only validation. Proves the contract before adding cache.', status: 'next' },
-      { n: 'E', title: 'Redis cache layer', desc: 'Cache key lookups with TTL; invalidate on rotate/revoke.', status: 'todo' },
+      { n: 'D', title: '/validate slow path', desc: 'Postgres-only validation (Bearer auth, single-JOIN key+tenant check). Baseline: 12k rps @ p99 17ms (c=50).', status: 'done' },
+      { n: 'E', title: 'Redis cache layer', desc: 'Local in-process cache + Redis pub/sub invalidation. The mechanism that scales to 1M rps.', status: 'next' },
       { n: 'F', title: 'Rate limiting', desc: 'Token bucket in Redis Lua. Integrate into /validate.', status: 'todo' },
       { n: 'G', title: 'Usage metering', desc: 'Counter increment + background flusher to Postgres rollups.', status: 'todo' },
       { n: 'H', title: 'Observability', desc: 'slog, /metrics (Prometheus), /healthz vs /readyz.', status: 'todo' },
