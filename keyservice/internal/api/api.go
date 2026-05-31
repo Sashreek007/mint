@@ -35,6 +35,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("POST /admin/tenants", s.handleCreateTenant)
 	mux.HandleFunc("POST /v1/tenants/{id}/keys", s.handleCreateKey)
+	mux.HandleFunc("POST /v1/validate", s.handleValidate)
 	return mux
 }
 
@@ -133,4 +134,43 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	fmt.Fprintf(w, `{"error":%q}`+"\n", msg)
+}
+
+func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
+	// Extract the key from "Authorization: Bearer ak_live_..."
+	authHeader := r.Header.Get("Authorization")
+	rawKey, ok := strings.CutPrefix(authHeader, "Bearer ")
+	if !ok || rawKey == "" {
+		// Malformed request — no/garbage Authorization header.
+		writeJSONError(w, http.StatusBadRequest, "missing bearer token")
+		return
+	}
+
+	// Hash the incoming key (same HMAC used at issuance) and look it up.
+	keyHash := keys.Hash(s.keyPepper, rawKey)
+	vk, err := s.store.ValidateKey(r.Context(), keyHash)
+	if err != nil {
+		if errors.Is(err, store.ErrKeyNotValid) {
+			// Bad/revoked/unknown key, or suspended tenant — fail closed + quiet.
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(struct {
+				Valid bool `json:"valid"`
+			}{false})
+			return
+		}
+		// A real DB failure — 500, not 401.
+		log.Printf("validate key: %v", err)
+		writeJSONError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	// Valid — return identity so the downstream can use it.
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(struct {
+		Valid    bool   `json:"valid"`
+		TenantID string `json:"tenant_id"`
+		KeyID    string `json:"key_id"`
+	}{true, vk.TenantID, vk.KeyID})
 }
