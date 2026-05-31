@@ -976,6 +976,54 @@
           { t: "Request-context to DB", d: "r.Context() is passed to pool calls. If the client disconnects mid-request, pgx aborts the in-flight Postgres query — no wasted work." },
           { t: "One-shot migration container", d: "migrate service gated with service_completed_successfully. Fresh clone → docker compose up → schema applied before keyservice ever starts." }
         ]
+      },
+      {
+        chunk: "C",
+        title: "API key issuance · crypto · package refactor",
+        concepts: [
+          // --- key generation
+          { t: "Entropy", d: "Unpredictability, measured in bits. Our key body is ~190 bits — the universe ends before you could brute-force it." },
+          { t: "crypto/rand vs math/rand", d: "math/rand is predictable (seeded, reproducible) — NEVER for secrets. crypto/rand pulls from the OS CSPRNG and is unpredictable. The only correct source for keys." },
+          { t: "CSPRNG", d: "Cryptographically-secure pseudo-random generator. On Linux, /dev/urandom — designed to be unpredictable even to an attacker who knows the system." },
+          { t: "base62", d: "Encoding using 0-9A-Za-z (62 symbols). Compact and URL-safe (no +, /, = like base64). Stripe-style keys use it." },
+          { t: "Modulo bias", d: "Mapping a byte (0–255) onto 62 symbols with % 62 skews the first 8 symbols, because 256 isn't a multiple of 62. A subtle entropy leak." },
+          { t: "Rejection sampling", d: "Fix for modulo bias: discard byte values ≥ 248 (=62×4) so the rest map uniformly. ~3% of bytes thrown away, zero bias." },
+          { t: "Key format (ak_live_…)", d: "Human-readable prefix (recognizable by secret-scanners) + high-entropy random body. Prefix carries meaning, body carries security." },
+          // --- hashing
+          { t: "One-way hash", d: "Function easy to compute forward (key → hash) but infeasible to reverse. SHA-256 maps any input to 32 fixed bytes." },
+          { t: "HMAC", d: "Hash-based Message Authentication Code — the sound way to combine a secret with a message. Avoids the length-extension bugs of naive pepper+key concatenation." },
+          { t: "Pepper", d: "A secret mixed into every hash, stored OUTSIDE the DB (env var). A database-only breach can't verify guessed keys without it." },
+          { t: "Salt vs pepper", d: "Salt: per-row, in the DB, not secret — defeats rainbow tables. Pepper: one global secret, outside the DB — defeats a DB-only leak. Keys are high-entropy so we use only the pepper." },
+          { t: "Show-once pattern", d: "Plaintext key is returned exactly once at creation, then only its hash is stored. Lost key → rotate. Same contract as Stripe/GitHub/AWS." },
+          { t: "key_prefix", d: "First ~20 chars kept in plaintext so dashboards can show ak_live_AbCd•••• after the full key is gone. Display hint, not a lookup key." },
+          // --- HTTP / handler
+          { t: "Path parameter", d: "The {id} wildcard in 'POST /v1/tenants/{id}/keys'. Pulled out with r.PathValue(\"id\") (Go 1.22+ router feature)." },
+          { t: "Postgres error codes", d: "Every pg error carries a SQLSTATE code: 22P02 = invalid text (bad UUID), 23503 = foreign-key violation (no such tenant). We branch on these." },
+          { t: "errors.As", d: "Unwraps an error chain looking for a specific concrete type (*pgconn.PgError) so we can read its .Code. The typed counterpart to errors.Is." },
+          { t: "Let-the-DB-validate", d: "Instead of a pre-check SELECT, pass the id to the INSERT and map the FK/cast error. One round-trip, and no TOCTOU race." },
+          { t: "TOCTOU race", d: "Time-of-check-to-time-of-use: the gap between checking a tenant exists and using it, where it could be deleted. Relying on the FK closes that gap." },
+          // --- Go packages / refactor
+          { t: "Go package", d: "A directory of .go files sharing a `package <name>` header. A new directory is a new package." },
+          { t: "Import path", d: "Module path (from go.mod) + the directory path, e.g. github.com/Sashreek007/mint/keyservice/internal/keys." },
+          { t: "Exported vs unexported", d: "Capitalized identifier (Generate, Store) = visible to other packages. lowercase (alphabet, pool) = private. Go's entire access-control system." },
+          { t: "internal/ packages", d: "A directory named internal can only be imported within the same module — a privacy fence around a service's guts." },
+          { t: "Name stutter", d: "Idiomatic Go drops redundancy: keys.Generate, not keys.GenerateKey — the package name already says 'key'." },
+          { t: "Method & receiver", d: "func (s *Store) CreateTenant(...) attaches a function to a type. s is the receiver, like self/this in other languages." },
+          { t: "Constructor (New)", d: "Convention: a package-level func New(...) that builds and returns the package's main type — store.New(pool), api.New(...)." },
+          { t: "Dependency injection", d: "Pass dependencies into a struct (the pool, tokens) instead of using globals. Explicit, testable, no hidden state." },
+          { t: "Sentinel error", d: "A package-level error value (store.ErrTenantNotFound) callers test with errors.Is. Lets the store report 'not found' without knowing about HTTP." },
+          { t: "Struct embedding", d: "Putting a type inside a struct without a field name (struct{ store.APIKey; Key string }). Its fields flatten in — used to add the one-time key to the JSON response." },
+          { t: "gofmt / go vet", d: "gofmt auto-formats to the one canonical Go style; go vet catches suspicious constructs. Run both before committing." }
+        ],
+        optimizations: [
+          { t: "HMAC-SHA256 + pepper (not Argon2id)", d: "Keys are already 192-bit random, so no slow KDF is needed — microsecond hashing keeps the future /validate hot path fast, while the pepper still defeats a DB-only leak." },
+          { t: "crypto/rand for key bytes", d: "Cryptographically-secure randomness for the key body — predictable math/rand would let an attacker reproduce every issued key." },
+          { t: "Rejection sampling (unbiased base62)", d: "Discarding bytes ≥ 248 removes the modulo-bias skew, so every key character is uniformly distributed — full entropy preserved." },
+          { t: "Show-once, hash-only storage", d: "The DB never holds a plaintext key; a stolen api_keys table is useless without the out-of-band pepper." },
+          { t: "key_hash BYTEA UNIQUE = the lookup index", d: "The uniqueness constraint auto-creates the B-tree index that /validate will hit — correctness guard and hot-path index in one column." },
+          { t: "Single-round-trip validation", d: "Letting Postgres validate the tenant via the FK + uuid cast (and mapping 22P02/23503) avoids a pre-check SELECT and the TOCTOU race." },
+          { t: "Layered packages + DI", d: "keys / store / api split by concern; main.go drops 248 → 70 lines of pure wiring. Each layer unit-testable in isolation; route registration centralized so the nesting bug can't recur." }
+        ]
       }
     ];
 
@@ -1033,8 +1081,8 @@
       { n: 'A2', title: 'Multi-stage Dockerfile', desc: '~22MB final image. Alpine runtime, non-root user, CA certs.', status: 'done' },
       { n: 'A3', title: 'docker-compose, load test, nginx tune', desc: 'Two keyservice replicas behind nginx. Verified 24k rps, p99 17ms at realistic concurrency.', status: 'done' },
       { n: 'B', title: 'Tenants — schema and CRUD', desc: 'golang-migrate, pgxpool, POST /admin/tenants with X-Admin-Token auth. First persistent state.', status: 'done' },
-      { n: 'C', title: 'API key issuance', desc: 'Generate, HMAC-hash, store. POST /v1/tenants/{id}/keys.', status: 'next' },
-      { n: 'D', title: '/validate slow path', desc: 'Postgres-only validation. Proves the contract before adding cache.', status: 'todo' },
+      { n: 'C', title: 'API key issuance', desc: 'crypto/rand + base62 keys, HMAC+pepper hashing, POST /v1/tenants/{id}/keys, layered into internal/ packages.', status: 'done' },
+      { n: 'D', title: '/validate slow path', desc: 'Postgres-only validation. Proves the contract before adding cache.', status: 'next' },
       { n: 'E', title: 'Redis cache layer', desc: 'Cache key lookups with TTL; invalidate on rotate/revoke.', status: 'todo' },
       { n: 'F', title: 'Rate limiting', desc: 'Token bucket in Redis Lua. Integrate into /validate.', status: 'todo' },
       { n: 'G', title: 'Usage metering', desc: 'Counter increment + background flusher to Postgres rollups.', status: 'todo' },
