@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -16,6 +17,7 @@ import (
 var (
 	ErrInvalidTenantID = errors.New("invalid tenant id")
 	ErrTenantNotFound  = errors.New("tenant not found")
+	ErrKeyNotValid     = errors.New("key not valid")
 )
 
 // Store wraps the pgx pool. The pool field is lowercase => private; callers
@@ -84,4 +86,31 @@ func (s *Store) CreateAPIKey(ctx context.Context, tenantID, name, keyPrefix stri
 		return APIKey{}, err
 	}
 	return k, nil
+}
+
+// ValidatesKey is the indentity returned when a key cheks out
+type ValidatedKey struct {
+	KeyID    string
+	TenantID string
+}
+
+// ValidateKey looks up a key by its hash and confirms both the key and its tenant are active.
+// Any miss collapses to ErrKeyNotValid
+func (s *Store) ValidateKey(ctx context.Context, keyHash []byte) (ValidatedKey, error) {
+	var vk ValidatedKey
+	err := s.pool.QueryRow(ctx,
+		`SELECT k.id, k.tenant_id
+		FROM api_keys k 
+		JOIN tenants t ON t.id = k.tenant_id
+		WHERE k.key_hash = $1
+		AND k.status = 'active'
+		AND t.status = 'active'
+		`, keyHash).Scan(&vk.KeyID, &vk.TenantID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ValidatedKey{}, ErrKeyNotValid
+		}
+		return ValidatedKey{}, err
+	}
+	return vk, nil
 }
