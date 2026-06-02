@@ -10,6 +10,7 @@ services:
       DATABASE_URL: "postgres://mint:mint_dev@postgres:5432/mint?sslmode=disable"
       ADMIN_TOKEN: "just-works-for-now" #reminder to use secret manager
       KEY_PEPPER: "dev-pepper-rotate-in-prod"
+      REDIS_URL: "redis://redis:6379/0" #schema://host:port:dotabase number
     depends_on:
       postgres:
         condition: service_healthy
