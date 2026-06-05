@@ -391,68 +391,96 @@
       <div class="stats">
         <div class="stat"><div class="v">5k</div><div class="l">target rps</div></div>
         <div class="stat"><div class="v">&lt;20ms</div><div class="l">p99 latency</div></div>
-        <div class="stat"><div class="v">99.9%</div><div class="l">reads on hot path</div></div>
-        <div class="stat"><div class="v">3</div><div class="l">core components</div></div>
+        <div class="stat"><div class="v">~99%</div><div class="l">L1 cache hits</div></div>
+        <div class="stat"><div class="v">3</div><div class="l">read tiers</div></div>
       </div>
     </section>
 
     <section id="architecture">
       <h2><span class="num">01</span>Architecture</h2>
-      <p class="lede">Three components, each with one job. Click any box to see what it does and why it is there.</p>
+      <p class="lede">A request to <code class="inline">/validate</code> walks a three-tier read path, each tier slower but more shared than the one above it: <strong>L1</strong> in-process memory (per replica) → <strong>L2</strong> Redis (shared) → <strong>Postgres</strong> (source of truth). ~99% of hits never leave the replica's own RAM. Click any box for detail.</p>
 
       <div class="arch-wrap">
-        <svg class="arch-svg" viewBox="0 0 800 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Architecture diagram">
+        <svg class="arch-svg" viewBox="0 0 820 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Architecture diagram">
           <defs>
             <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
               <path d="M0,0 L0,6 L9,3 z" fill="#8b949e"/>
             </marker>
           </defs>
 
+          <!-- downstream -->
           <g class="node" data-id="downstream">
-            <rect x="30" y="40" width="170" height="70" rx="8"/>
-            <text x="115" y="70">Downstream</text>
-            <text x="115" y="90" class="sub">other backends</text>
+            <rect x="20" y="40" width="160" height="70" rx="8"/>
+            <text x="100" y="70">Downstream</text>
+            <text x="100" y="90" class="sub">other backends</text>
           </g>
-          <path class="arrow" d="M 200 75 L 280 75" marker-end="url(#arrowhead)"/>
-          <text class="arrow-label" x="240" y="66">/validate</text>
+          <path class="arrow" d="M 180 75 L 250 75" marker-end="url(#arrowhead)"/>
+          <text class="arrow-label" x="215" y="66">/validate</text>
 
+          <!-- nginx -->
           <g class="node" data-id="nginx">
-            <rect x="280" y="40" width="150" height="70" rx="8"/>
-            <text x="355" y="70">nginx</text>
-            <text x="355" y="90" class="sub">load balancer</text>
+            <rect x="250" y="40" width="140" height="70" rx="8"/>
+            <text x="320" y="70">nginx</text>
+            <text x="320" y="90" class="sub">load balancer</text>
           </g>
-          <path class="arrow" d="M 430 60 L 510 30" marker-end="url(#arrowhead)"/>
-          <path class="arrow" d="M 430 90 L 510 120" marker-end="url(#arrowhead)"/>
+          <path class="arrow" d="M 390 62 L 460 42" marker-end="url(#arrowhead)"/>
+          <path class="arrow" d="M 390 90 L 460 128" marker-end="url(#arrowhead)"/>
+
+          <!-- keyservice replicas, each containing an L1 box -->
+          <g class="node" data-id="keyservice">
+            <rect x="460" y="10" width="200" height="64" rx="8"/>
+            <text x="540" y="32">keyservice replica 1</text>
+            <text x="540" y="50" class="sub">stateless</text>
+          </g>
+          <g class="node" data-id="l1">
+            <rect x="476" y="40" width="168" height="26" rx="5"/>
+            <text x="560" y="57" class="sub">L1: in-process cache (~0.2ms)</text>
+          </g>
 
           <g class="node" data-id="keyservice">
-            <rect x="510" y="0" width="170" height="60" rx="8"/>
-            <text x="595" y="26">keyservice</text>
-            <text x="595" y="46" class="sub">replica 1 (stateless)</text>
+            <rect x="460" y="96" width="200" height="64" rx="8"/>
+            <text x="540" y="118">keyservice replica 2</text>
+            <text x="540" y="136" class="sub">stateless</text>
           </g>
-          <g class="node" data-id="keyservice">
-            <rect x="510" y="90" width="170" height="60" rx="8"/>
-            <text x="595" y="116">keyservice</text>
-            <text x="595" y="136" class="sub">replica 2 (stateless)</text>
+          <g class="node" data-id="l1">
+            <rect x="476" y="126" width="168" height="26" rx="5"/>
+            <text x="560" y="143" class="sub">L1: in-process cache (~0.2ms)</text>
           </g>
 
-          <path class="arrow" d="M 595 150 L 400 240" marker-end="url(#arrowhead)"/>
-          <text class="arrow-label" x="490" y="190">~1ms</text>
-          <path class="arrow" d="M 595 150 L 595 240" marker-end="url(#arrowhead)"/>
-          <text class="arrow-label" x="610" y="200">cache miss only</text>
+          <!-- L1 miss -> L2 Redis -->
+          <path class="arrow" d="M 560 160 L 420 270" marker-end="url(#arrowhead)"/>
+          <text class="arrow-label" x="455" y="220">L1 miss (~1%)</text>
 
+          <!-- L2 miss -> Postgres -->
+          <path class="arrow" d="M 560 160 L 660 270" marker-end="url(#arrowhead)"/>
+          <text class="arrow-label" x="660" y="220">L1+L2 miss</text>
+
+          <!-- L2 Redis -->
           <g class="node" data-id="redis">
-            <rect x="300" y="240" width="200" height="100" rx="8"/>
-            <text x="400" y="272">Redis</text>
-            <text x="400" y="294" class="sub">cache · counters · buckets</text>
-            <text x="400" y="314" class="sub">~100k ops/sec</text>
+            <rect x="280" y="270" width="230" height="120" rx="8"/>
+            <text x="395" y="300">Redis</text>
+            <text x="395" y="322" class="sub">L2 cache (shared, ~1ms)</text>
+            <text x="395" y="340" class="sub">+ pub/sub invalidation bus</text>
+            <text x="395" y="358" class="sub">+ counters · rate buckets</text>
+            <text x="395" y="376" class="sub">~100k ops/sec ceiling</text>
           </g>
 
+          <!-- L2 miss -> Postgres -->
+          <path class="arrow" d="M 510 320 L 600 320" marker-end="url(#arrowhead)"/>
+          <text class="arrow-label" x="555" y="312">L2 miss</text>
+
+          <!-- Postgres -->
           <g class="node" data-id="postgres">
-            <rect x="510" y="240" width="200" height="100" rx="8"/>
-            <text x="610" y="272">Postgres</text>
-            <text x="610" y="294" class="sub">source of truth</text>
-            <text x="610" y="314" class="sub">tenants · keys · rollups</text>
+            <rect x="600" y="270" width="200" height="120" rx="8"/>
+            <text x="700" y="300">Postgres</text>
+            <text x="700" y="322" class="sub">source of truth</text>
+            <text x="700" y="340" class="sub">tenants · keys · rollups</text>
+            <text x="700" y="358" class="sub">off the hot path</text>
           </g>
+
+          <!-- invalidation broadcast back up -->
+          <path class="arrow" d="M 395 270 C 395 200, 470 190, 476 160" marker-end="url(#arrowhead)" stroke-dasharray="4 3"/>
+          <text class="arrow-label" x="360" y="200">revoke → evict L1</text>
         </svg>
 
         <div class="arch-detail" id="arch-detail">
@@ -738,27 +766,36 @@
       },
       keyservice: {
         title: "keyservice — the Go HTTP service",
-        body: "Stateless, horizontally scalable Go service. Holds nothing in memory between requests. Each request talks to Redis (and rarely Postgres). Two replicas locally; six-plus in production with autoscaling.",
+        body: "Stateless, horizontally scalable Go service. Each replica carries its own L1 in-process cache. A validate checks L1 first, then L2 (Redis), then Postgres. Two replicas locally; many in production with autoscaling.",
         bullets: [
-          "Statelessness is the property that lets us add replicas freely.",
+          "Statelessness (no shared mutable state) is what lets us add replicas freely.",
           "Built as a static binary (CGO_ENABLED=0) and shipped in a ~22MB Alpine image.",
           "Runs as a non-root user inside the container."
         ]
       },
-      redis: {
-        title: "Redis — the hot-path accelerator",
-        body: "In-memory key-value store. Plays three roles simultaneously: (1) cache of key → tenant lookups, (2) rate-limit token buckets, (3) usage counters waiting to be flushed.",
+      l1: {
+        title: "L1 — in-process cache (per replica)",
+        body: "A concurrency-safe Go map living inside each keyservice process. The fastest tier — answering a validate is just a memory read (~0.2ms), no network hop at all. Targets ~99% of all validate traffic.",
         bullets: [
-          "~1ms per op, ~100k ops/sec per node. 20× headroom over our 5k rps target.",
-          "All validate-path operations are bundled into a single Lua script — one network round-trip.",
-          "If Redis dies: degrade gracefully — fall back to Postgres for auth, skip rate limiting."
+          "Per-replica, NOT shared — each replica caches independently. This is what removes the shared bottleneck and scales near-linearly.",
+          "Guarded by a sync.RWMutex: many readers at once, one writer at a time. Entries carry a TTL and auto-expire on read.",
+          "The tradeoff it creates: a revoked key can linger in one replica's L1 — solved by Redis pub/sub invalidation (the dashed arrow)."
+        ]
+      },
+      redis: {
+        title: "Redis — L2 cache + invalidation bus",
+        body: "In-memory key-value store, SHARED across all replicas. Three roles: (1) L2 cache behind L1 — catches cross-replica and cold-start misses before they reach Postgres; (2) the pub/sub bus that broadcasts revocations so every replica evicts from its L1; (3) later: rate-limit buckets + usage counters.",
+        bullets: [
+          "~1ms per op, ~100k ops/sec per node — the shared ceiling L1 exists to stay under.",
+          "On revoke: PUBLISH the key hash; every replica is SUBSCRIBE'd and evicts it from L1 instantly. TTL is the backstop.",
+          "If Redis dies: L1 still serves hits; misses fall through to Postgres. Auth degrades gracefully, never fails open."
         ]
       },
       postgres: {
         title: "Postgres — the source of truth",
         body: "Authoritative data: tenants, api_keys (with key_hash), usage rollups. Hit only on cache miss and admin writes — not on the hot path.",
         bullets: [
-          "Cache hit rate stays near 100% with 5-minute TTL, so Postgres rarely sees validate traffic.",
+          "Only reached on an L1+L2 miss (~1% of validates), so Postgres rarely sees hot-path traffic.",
           "Usage flusher uses INSERT ... ON CONFLICT for idempotent batch upserts.",
           "Schema is small and structured — classic relational fit."
         ]
