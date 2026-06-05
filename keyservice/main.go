@@ -57,7 +57,6 @@ func main() {
 		log.Fatalf("redis ping failed: %v", err)
 	}
 	log.Printf("redis ok: %s", redisOpt.Addr)
-	_ = rdb
 
 	// --- connection pool ---
 	cfg, err := pgxpool.ParseConfig(dsn)
@@ -82,7 +81,8 @@ func main() {
 
 	st := store.New(pool)
 	c := cache.New()
-	srv := api.New(st, c, adminToken, keyPepper, replicaID)
+	l2 := cache.NewL2(rdb)
+	srv := api.New(st, c, l2, adminToken, keyPepper, replicaID)
 
 	addr := ":8080"
 	log.Printf("keyservice replica=%s listening on %s", replicaID, addr)

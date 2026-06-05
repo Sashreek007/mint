@@ -17,13 +17,6 @@ import (
 	"github.com/Sashreek007/mint/keyservice/internal/store"
 )
 
-// cachesResult is what we store in L1 for a given key hash.
-type cachedResult struct {
-	valid    bool
-	tenantID string
-	keyID    string
-}
-
 const (
 	ttlValid   = 5 * time.Minute
 	ttlInvalid = 30 * time.Second
@@ -34,13 +27,14 @@ const (
 type Server struct {
 	store      *store.Store
 	cache      *cache.Cache
+	l2         *cache.L2
 	adminToken string
 	keyPepper  string
 	replicaID  string
 }
 
-func New(st *store.Store, c *cache.Cache, adminToken, keyPepper, replicaID string) *Server {
-	return &Server{store: st, cache: c, adminToken: adminToken, keyPepper: keyPepper, replicaID: replicaID}
+func New(st *store.Store, c *cache.Cache, l2 *cache.L2, adminToken, keyPepper, replicaID string) *Server {
+	return &Server{store: st, cache: c, l2: l2, adminToken: adminToken, keyPepper: keyPepper, replicaID: replicaID}
 }
 
 // Routes builds the router. All registration happens here, once — the lesson
@@ -161,35 +155,52 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 
 	keyHash := keys.Hash(s.keyPepper, rawKey)
 	cacheKey := string(keyHash)
+	ctx := r.Context()
 
-	// L1 check
+	// --- L1: in-process ---
 	if v, hit := s.cache.Get(cacheKey); hit {
-		s.writeValidateResult(w, v.(cachedResult))
+		s.writeValidateResult(w, v.(cache.Result))
 		return
 	}
 
-	// L1 miss → Postgres
-	vk, err := s.store.ValidateKey(r.Context(), keyHash)
+	// --- L2: Redis ---
+	if res, hit := s.l2.Get(ctx, cacheKey); hit {
+		s.cache.Set(cacheKey, res, ttlFor(res)) // backfill L1
+		s.writeValidateResult(w, res)
+		return
+	}
+
+	// --- L3: Postgres (source of truth) ---
+	vk, err := s.store.ValidateKey(ctx, keyHash)
+	var res cache.Result
 	if err != nil {
-		if errors.Is(err, store.ErrKeyNotValid) {
-			cr := cachedResult{valid: false}
-			s.cache.Set(cacheKey, cr, ttlInvalid)
-			s.writeValidateResult(w, cr)
-			return
+		if !errors.Is(err, store.ErrKeyNotValid) {
+			log.Printf("validate key: %v", err)
+			writeJSONError(w, http.StatusInternalServerError, "internal error")
+			return // real DB error → don't cache
 		}
-		log.Printf("validate key: %v", err)
-		writeJSONError(w, http.StatusInternalServerError, "internal error")
-		return
+		res = cache.Result{Valid: false}
+	} else {
+		res = cache.Result{Valid: true, TenantID: vk.TenantID, KeyID: vk.KeyID}
 	}
 
-	cr := cachedResult{valid: true, tenantID: vk.TenantID, keyID: vk.KeyID}
-	s.cache.Set(cacheKey, cr, ttlValid)
-	s.writeValidateResult(w, cr)
+	// write through to both cache tiers
+	s.cache.Set(cacheKey, res, ttlFor(res))
+	s.l2.Set(ctx, cacheKey, res, ttlFor(res))
+	s.writeValidateResult(w, res)
 }
 
-func (s *Server) writeValidateResult(w http.ResponseWriter, cr cachedResult) {
+// ttlFor picks the TTL based on whether the result is valid.
+func ttlFor(res cache.Result) time.Duration {
+	if res.Valid {
+		return ttlValid
+	}
+	return ttlInvalid
+}
+
+func (s *Server) writeValidateResult(w http.ResponseWriter, res cache.Result) {
 	w.Header().Set("Content-Type", "application/json")
-	if !cr.valid {
+	if !res.Valid {
 		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(struct {
 			Valid bool `json:"valid"`
@@ -201,5 +212,5 @@ func (s *Server) writeValidateResult(w http.ResponseWriter, cr cachedResult) {
 		Valid    bool   `json:"valid"`
 		TenantID string `json:"tenant_id"`
 		KeyID    string `json:"key_id"`
-	}{true, cr.tenantID, cr.keyID})
+	}{true, res.TenantID, res.KeyID})
 }

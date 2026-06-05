@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+// Result is a validation outcome, cached in L1 (as a value) and L2 (as JSON).
+type Result struct {
+	Valid    bool   `json:"valid"`
+	TenantID string `json:"tenant_id"`
+	KeyID    string `json:"key_id"`
+}
+
 // entry is one caches value plus when it expires
 type entry struct {
 	value     any
