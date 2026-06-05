@@ -11,6 +11,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/Sashreek007/mint/keyservice/internal/api"
+	"github.com/Sashreek007/mint/keyservice/internal/cache"
 	"github.com/Sashreek007/mint/keyservice/internal/store"
 )
 
@@ -80,7 +81,8 @@ func main() {
 	log.Printf("postgres ok: max_conns=%d", cfg.MaxConns)
 
 	st := store.New(pool)
-	srv := api.New(st, adminToken, keyPepper, replicaID)
+	c := cache.New()
+	srv := api.New(st, c, adminToken, keyPepper, replicaID)
 
 	addr := ":8080"
 	log.Printf("keyservice replica=%s listening on %s", replicaID, addr)

@@ -10,22 +10,37 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/Sashreek007/mint/keyservice/internal/cache"
 	"github.com/Sashreek007/mint/keyservice/internal/keys"
 	"github.com/Sashreek007/mint/keyservice/internal/store"
+)
+
+// cachesResult is what we store in L1 for a given key hash.
+type cachedResult struct {
+	valid    bool
+	tenantID string
+	keyID    string
+}
+
+const (
+	ttlValid   = 5 * time.Minute
+	ttlInvalid = 30 * time.Second
 )
 
 // Server holds the handlers' dependencies. Lowercase fields => private; they
 // are injected once via New and never mutated.
 type Server struct {
 	store      *store.Store
+	cache      *cache.Cache
 	adminToken string
 	keyPepper  string
 	replicaID  string
 }
 
-func New(st *store.Store, adminToken, keyPepper, replicaID string) *Server {
-	return &Server{store: st, adminToken: adminToken, keyPepper: keyPepper, replicaID: replicaID}
+func New(st *store.Store, c *cache.Cache, adminToken, keyPepper, replicaID string) *Server {
+	return &Server{store: st, cache: c, adminToken: adminToken, keyPepper: keyPepper, replicaID: replicaID}
 }
 
 // Routes builds the router. All registration happens here, once — the lesson
@@ -137,40 +152,54 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 }
 
 func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
-	// Extract the key from "Authorization: Bearer ak_live_..."
 	authHeader := r.Header.Get("Authorization")
 	rawKey, ok := strings.CutPrefix(authHeader, "Bearer ")
 	if !ok || rawKey == "" {
-		// Malformed request — no/garbage Authorization header.
 		writeJSONError(w, http.StatusBadRequest, "missing bearer token")
 		return
 	}
 
-	// Hash the incoming key (same HMAC used at issuance) and look it up.
 	keyHash := keys.Hash(s.keyPepper, rawKey)
+	cacheKey := string(keyHash)
+
+	// L1 check
+	if v, hit := s.cache.Get(cacheKey); hit {
+		s.writeValidateResult(w, v.(cachedResult))
+		return
+	}
+
+	// L1 miss → Postgres
 	vk, err := s.store.ValidateKey(r.Context(), keyHash)
 	if err != nil {
 		if errors.Is(err, store.ErrKeyNotValid) {
-			// Bad/revoked/unknown key, or suspended tenant — fail closed + quiet.
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(struct {
-				Valid bool `json:"valid"`
-			}{false})
+			cr := cachedResult{valid: false}
+			s.cache.Set(cacheKey, cr, ttlInvalid)
+			s.writeValidateResult(w, cr)
 			return
 		}
-		// A real DB failure — 500, not 401.
 		log.Printf("validate key: %v", err)
 		writeJSONError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 
-	// Valid — return identity so the downstream can use it.
+	cr := cachedResult{valid: true, tenantID: vk.TenantID, keyID: vk.KeyID}
+	s.cache.Set(cacheKey, cr, ttlValid)
+	s.writeValidateResult(w, cr)
+}
+
+func (s *Server) writeValidateResult(w http.ResponseWriter, cr cachedResult) {
 	w.Header().Set("Content-Type", "application/json")
+	if !cr.valid {
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(struct {
+			Valid bool `json:"valid"`
+		}{false})
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(struct {
 		Valid    bool   `json:"valid"`
 		TenantID string `json:"tenant_id"`
 		KeyID    string `json:"key_id"`
-	}{true, vk.TenantID, vk.KeyID})
+	}{true, cr.tenantID, cr.keyID})
 }
