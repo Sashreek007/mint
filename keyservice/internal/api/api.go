@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Sashreek007/mint/keyservice/internal/cache"
@@ -33,6 +34,10 @@ type Server struct {
 	adminToken string
 	keyPepper  string
 	replicaID  string
+
+	l1Hits atomic.Int64
+	l2Hits atomic.Int64
+	misses atomic.Int64
 }
 
 func New(st *store.Store, c *cache.Cache, l2 *cache.L2, rdb *redis.Client, adminToken, keyPepper, replicaID string) *Server {
@@ -48,6 +53,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /v1/tenants/{id}/keys", s.handleCreateKey)
 	mux.HandleFunc("POST /v1/validate", s.handleValidate)
 	mux.HandleFunc("POST /v1/keys/{id}/revoke", s.handleRevokeKey)
+	mux.HandleFunc("GET /v1/cache/stats", s.handleCacheStats)
 	return mux
 }
 
@@ -162,18 +168,21 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 
 	// --- L1: in-process ---
 	if v, hit := s.cache.Get(cacheKey); hit {
+		s.l1Hits.Add(1)
 		s.writeValidateResult(w, v.(cache.Result))
 		return
 	}
 
 	// --- L2: Redis ---
 	if res, hit := s.l2.Get(ctx, cacheKey); hit {
+		s.l2Hits.Add(1)
 		s.cache.Set(cacheKey, res, ttlFor(res)) // backfill L1
 		s.writeValidateResult(w, res)
 		return
 	}
 
 	// --- L3: Postgres (source of truth) ---
+	s.misses.Add(1)
 	vk, err := s.store.ValidateKey(ctx, keyHash)
 	var res cache.Result
 	if err != nil {
@@ -250,4 +259,27 @@ func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 		log.Printf("publish revocation: %v", err)
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleCacheStats(w http.ResponseWriter, r *http.Request) {
+	l1 := s.l1Hits.Load()
+	l2 := s.l2Hits.Load()
+	miss := s.misses.Load()
+	total := l1 + l2 + miss
+
+	var hitRate float64
+	if total > 0 {
+		hitRate = float64(l1+l2) / float64(total)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(struct {
+		L1Hits  int64   `json:"l1_hits"`
+		L2Hits  int64   `json:"l2_hits"`
+		Misses  int64   `json:"misses"`
+		Total   int64   `json:"total"`
+		HitRate float64 `json:"hit_rate"`
+		Replica string  `json:"replica"`
+	}{l1, l2, miss, total, hitRate, s.replicaID})
 }
