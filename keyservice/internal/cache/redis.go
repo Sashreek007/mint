@@ -40,3 +40,8 @@ func (l *L2) Set(ctx context.Context, keyHash string, r Result, ttl time.Duratio
 	}
 	_ = l.rdb.Set(ctx, l2Prefix+keyHash, b, ttl).Err()
 }
+
+// Delete removes a key from the L2 cache
+func (l *L2) Delete(ctx context.Context, keyHash string) {
+	_ = l.rdb.Del(ctx, l2Prefix+keyHash).Err()
+}

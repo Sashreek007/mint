@@ -82,8 +82,9 @@ func main() {
 	st := store.New(pool)
 	c := cache.New()
 	l2 := cache.NewL2(rdb)
-	srv := api.New(st, c, l2, adminToken, keyPepper, replicaID)
+	srv := api.New(st, c, l2, rdb, adminToken, keyPepper, replicaID)
 
+	go cache.SubscribeRevocations(context.Background(), rdb, c)
 	addr := ":8080"
 	log.Printf("keyservice replica=%s listening on %s", replicaID, addr)
 	if err := http.ListenAndServe(addr, srv.Routes()); err != nil {

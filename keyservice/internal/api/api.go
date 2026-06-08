@@ -15,6 +15,7 @@ import (
 	"github.com/Sashreek007/mint/keyservice/internal/cache"
 	"github.com/Sashreek007/mint/keyservice/internal/keys"
 	"github.com/Sashreek007/mint/keyservice/internal/store"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
@@ -28,13 +29,14 @@ type Server struct {
 	store      *store.Store
 	cache      *cache.Cache
 	l2         *cache.L2
+	rdb        *redis.Client
 	adminToken string
 	keyPepper  string
 	replicaID  string
 }
 
-func New(st *store.Store, c *cache.Cache, l2 *cache.L2, adminToken, keyPepper, replicaID string) *Server {
-	return &Server{store: st, cache: c, l2: l2, adminToken: adminToken, keyPepper: keyPepper, replicaID: replicaID}
+func New(st *store.Store, c *cache.Cache, l2 *cache.L2, rdb *redis.Client, adminToken, keyPepper, replicaID string) *Server {
+	return &Server{store: st, cache: c, l2: l2, rdb: rdb, adminToken: adminToken, keyPepper: keyPepper, replicaID: replicaID}
 }
 
 // Routes builds the router. All registration happens here, once — the lesson
@@ -45,6 +47,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /admin/tenants", s.handleCreateTenant)
 	mux.HandleFunc("POST /v1/tenants/{id}/keys", s.handleCreateKey)
 	mux.HandleFunc("POST /v1/validate", s.handleValidate)
+	mux.HandleFunc("POST /v1/keys/{id}/revoke", s.handleRevokeKey)
 	return mux
 }
 
@@ -213,4 +216,38 @@ func (s *Server) writeValidateResult(w http.ResponseWriter, res cache.Result) {
 		TenantID string `json:"tenant_id"`
 		KeyID    string `json:"key_id"`
 	}{true, res.TenantID, res.KeyID})
+}
+
+func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
+	if !s.authAdmin(r) {
+		writeJSONError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	keyID := r.PathValue("id")
+	ctx := r.Context()
+
+	//revoke in postgres, get the hash back
+	keyHash, err := s.store.RevokeKey(ctx, keyID)
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrInvalidTenantID):
+			writeJSONError(w, http.StatusBadRequest, "invalid key id")
+		case errors.Is(err, store.ErrKeyNotValid):
+			writeJSONError(w, http.StatusNotFound, "key not found or already revoked")
+		default:
+			log.Printf("revoke key: %v", err)
+			writeJSONError(w, http.StatusInternalServerError, "internal error")
+		}
+		return
+	}
+	cacheKey := string(keyHash)
+
+	//evict from L2 cache
+	s.l2.Delete(ctx, cacheKey)
+
+	if err := cache.PublishRevocation(ctx, s.rdb, cacheKey); err != nil {
+		log.Printf("publish revocation: %v", err)
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
