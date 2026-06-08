@@ -114,3 +114,24 @@ func (s *Store) ValidateKey(ctx context.Context, keyHash []byte) (ValidatedKey, 
 	}
 	return vk, nil
 }
+
+// RevokeKey marks a key revoked and returns its keu_hash. Caller should evict it from the caches
+func (s *Store) RevokeKey(ctx context.Context, keyID string) ([]byte, error) {
+	var keyHash []byte
+	err := s.pool.QueryRow(ctx,
+		`UPDATE api_keys
+				SET status = 'revoked', revoked_at = now()
+		WHERE id = $1 AND status = 'active'
+		RETURNING key_hash`, keyID).Scan(&keyHash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrKeyNotValid
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "22P02" {
+			return nil, ErrInvalidTenantID
+		}
+		return nil, err
+	}
+	return keyHash, nil
+}
