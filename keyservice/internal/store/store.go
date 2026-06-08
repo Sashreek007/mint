@@ -135,3 +135,38 @@ func (s *Store) RevokeKey(ctx context.Context, keyID string) ([]byte, error) {
 	}
 	return keyHash, nil
 }
+
+// ActiveKey is one row for cache pre-warming: the hash plus who it belongs to.
+type ActiveKey struct {
+	KeyHash  []byte
+	KeyID    string
+	TenantID string
+}
+
+// RecentActiveKeys returns up to limit active keys (tenant also active),
+// most-recently-used first — the hot set worth pre-warming into L1.
+func (s *Store) RecentActiveKeys(ctx context.Context, limit int) ([]ActiveKey, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT k.key_hash, k.id, k.tenant_id
+		   FROM api_keys k
+		   JOIN tenants  t ON t.id = k.tenant_id
+		  WHERE k.status = 'active' AND t.status = 'active'
+		  ORDER BY k.last_used_at DESC NULLS LAST
+		  LIMIT $1`,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []ActiveKey
+	for rows.Next() {
+		var a ActiveKey
+		if err := rows.Scan(&a.KeyHash, &a.KeyID, &a.TenantID); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}

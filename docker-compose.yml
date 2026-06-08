@@ -11,6 +11,7 @@ services:
       ADMIN_TOKEN: "just-works-for-now" #reminder to use secret manager
       KEY_PEPPER: "dev-pepper-rotate-in-prod"
       REDIS_URL: "redis://redis:6379/0" #schema://host:port:dotabase number
+      PREWARM_LIMIT: "1000"
     depends_on:
       postgres:
         condition: service_healthy

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,6 +40,12 @@ func main() {
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
 		log.Fatal("REDIS_URL is required")
+	}
+	prewarmLimit := 1000 // default
+	if v := os.Getenv("PREWARM_LIMIT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			prewarmLimit = n
+		}
 	}
 
 	// Shared 5s startup deadline for all dependency connects (redis + postgres).
@@ -81,6 +88,22 @@ func main() {
 
 	st := store.New(pool)
 	c := cache.New()
+	// Pre-warm L1 with the hot key set (skip if PREWARM_LIMIT=0).
+	if prewarmLimit > 0 {
+		keysList, err := st.RecentActiveKeys(startupCtx, prewarmLimit)
+		if err != nil {
+			log.Printf("prewarm failed (continuing cold): %v", err)
+		} else {
+			for _, k := range keysList {
+				c.Set(string(k.KeyHash), cache.Result{
+					Valid:    true,
+					TenantID: k.TenantID,
+					KeyID:    k.KeyID,
+				}, time.Hour) // long TTL; pub/sub evicts on revoke
+			}
+			log.Printf("prewarmed %d keys into L1", len(keysList))
+		}
+	}
 	l2 := cache.NewL2(rdb)
 	srv := api.New(st, c, l2, rdb, adminToken, keyPepper, replicaID)
 
