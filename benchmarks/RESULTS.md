@@ -17,8 +17,8 @@ Where a target is not yet met on this hardware, the real value is reported as-is
 > **Laptop caveat:** the load generator (`hey`) runs on the *same* machine as the
 > full stack, competing for the same 10 cores. This understates true capacity and
 > makes high-concurrency runs noisy (±~30% run-to-run). Absolute numbers are a
-> floor; the **before/after deltas** are the reliable signal. A single-node cloud
-> run (separate load generator) is planned at project end for honest absolutes.
+> floor; the **before/after deltas** are the reliable signal. On dedicated
+> hardware with a separate load generator the absolute numbers would be higher.
 
 ## Load tool
 
@@ -94,10 +94,9 @@ saturation, not Mint. Reported for honesty; not used as capacity figures.
   misses + 3 L2 hits — proof the cache is warming under traffic, not pre-loaded
   to a fake 100%.
 - **Throughput is noisy on a laptop** (±~30%). 18,292 rps is a representative
-  well-conditioned run; some runs read ~10–15k under background load. The cloud
-  single-node run will give the stable absolute.
-- **30k cached target** is expected to land on a dedicated single node (no
-  load-gen contention), not on this laptop. Recorded honestly as 18k here.
+  well-conditioned run; some runs read ~10–15k under background load.
+- **30k cached target** would require dedicated hardware (no load-gen contention
+  for cores). On this laptop the honest measured value is 18k — recorded as-is.
 
 ## Reproduce
 
