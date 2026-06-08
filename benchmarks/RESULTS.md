@@ -51,6 +51,31 @@ The headline: p99 moved from **17 ms (right at the 20 ms budget)** to **10 ms
 (comfortable headroom)**, and throughput rose 52% — by serving ~99.99% of requests
 from in-process memory instead of Postgres.
 
+## L2 (Redis) tier — cross-replica demonstration
+
+The throughput benchmark hammers **one warm key**, so every request is an L1 hit
+and L2 is never reached (correct behaviour — L1 is the fast path). L2 only earns
+its keep with **many distinct keys across multiple replicas**: a key cached in
+replica-1's L1 is an L1 *miss* on replica-2 but an L2 *hit* (replica-1 already
+wrote it to shared Redis), so replica-2 skips Postgres.
+
+`benchmarks/l2_demo.py` exercises exactly that: 300 keys × 5 passes = 1500
+validates across 2 cold replicas. Summed over both replicas:
+
+| Tier | Hits | Share | Meaning |
+|---|---|---|---|
+| L1 (in-process) | 900 | 60.0% | key already local to that replica |
+| **L2 (Redis)** | **287** | **19.1%** | cross-replica hit — **287 Postgres queries avoided** |
+| Miss → Postgres | 313 | 20.9% | first sight of each key (~1 per key) |
+
+Without L2, those 287 cross-replica hits would have been misses → ~600 Postgres
+queries instead of 313. **L2 roughly halved database load** in this scenario.
+
+> Reproduce: `python3 benchmarks/l2_demo.py 300 5`, then sum
+> `/v1/cache/stats` across replicas (the demo prints the command).
+> Note: the demo measures **cache behaviour**, not throughput (it's a Python
+> driver with mint overhead) — use the `hey` runs above for rps/latency.
+
 ## Saturation behaviour (overload, C=1000)
 
 | | Baseline | Cached |
