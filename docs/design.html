@@ -1087,6 +1087,49 @@
           { t: "Reuse keys.Hash on the hot path", d: "Validation hashes the incoming key with the exact HMAC+pepper used at issuance — microsecond cost, and it indexes straight into key_hash BYTEA UNIQUE." },
           { t: "Baseline measured before optimizing", d: "Postgres-only /validate benchmarked first (12k rps @ p99 17ms, c=50) so Chunk E's cache has a real 'before' number to prove against. Diagnose before optimize." }
         ]
+      },
+      {
+        chunk: "E",
+        title: "Cache layer · L1 + L2 + pub/sub invalidation",
+        concepts: [
+          // --- caching fundamentals
+          { t: "Cache", d: "A small fast store of recently-computed answers so you don't recompute them. Check it first; on a miss, compute and store for next time." },
+          { t: "Cache hit / miss", d: "Hit = the answer was cached (fast). Miss = not cached, fall to a slower source, then store the result." },
+          { t: "Cache tiers (L1/L2)", d: "Layered caches, each slower but more shared than the one above. L1 = per-replica memory (~0.2ms); L2 = shared Redis (~1ms); then Postgres." },
+          { t: "L1 — in-process cache", d: "A Go map inside each replica. Fastest tier (a memory read, no network). Per-replica, so it scales with replica count — no shared bottleneck." },
+          { t: "L2 — shared Redis cache", d: "Redis behind L1. Catches cross-replica and cold-start misses: a key cached on replica A is an L2 hit on replica B, sparing Postgres." },
+          { t: "Read-through cache", d: "Reads check tiers top-down (L1→L2→DB); the slow source is consulted only on a miss." },
+          { t: "Write-through / backfill", d: "On a miss, write the answer into the caches so the next read is a hit. An L2 hit also backfills L1 — each tier warms the one above it." },
+          { t: "Negative caching", d: "Cache 'this key is invalid' too (short TTL), so a flood of bad keys can't keep hammering Postgres." },
+          { t: "TTL (time-to-live)", d: "Each cached entry auto-expires after N seconds. Stale data disappears on its own; here it's the safety net behind active invalidation." },
+          // --- invalidation
+          { t: "Cache invalidation", d: "Removing stale entries when the truth changes (a key is revoked). The hard half of caching — a stale 'valid' for a revoked key is a security hole." },
+          { t: "The multi-replica problem", d: "A revoke hits ONE replica, but the key is cached on ALL of them. The other replicas must be told to evict — otherwise the key keeps working there." },
+          { t: "Redis pub/sub", d: "Publish/subscribe: one process PUBLISHes to a channel, all SUBSCRIBErs receive it. Our 'revocations' channel broadcasts evictions fleet-wide." },
+          { t: "Channel (Redis vs Go)", d: "Two senses: a Redis pub/sub topic, and a Go `chan` (in-process pipe). sub.Channel() bridges them — Redis messages arrive on a Go channel you range over." },
+          { t: "Subscriber goroutine", d: "A background goroutine per replica that ranges over the revocations channel forever, deleting each received key hash from its own L1." },
+          // --- Go concepts
+          { t: "Goroutine", d: "A concurrent function (Go's lightweight thread, ~2KB). The HTTP server spawns one per request; we also spawn one for the revocation subscriber." },
+          { t: "Mutex", d: "A lock: one goroutine in the guarded section at a time. Protects shared data (our cache map) from concurrent-write crashes." },
+          { t: "sync.RWMutex", d: "Read-write lock: many readers at once (RLock), or one writer alone (Lock). Fits a read-heavy cache — reads parallelise, writes serialise." },
+          { t: "atomic.Int64", d: "A counter safe to increment from many goroutines without a lock — the increment is one indivisible step. Used for hit/miss counters." },
+          { t: "Data race", d: "Two goroutines touching the same memory unsynchronised (e.g. count++ from many) → lost updates / corruption. Fixed with mutex or atomic." },
+          { t: "Type assertion", d: "v.(cache.Result) — pull a concrete type back out of an `any` value. Used to read results stored in the L1 map." },
+          { t: "Query vs QueryRow", d: "QueryRow = exactly one row. Query = many rows: defer rows.Close(), loop rows.Next(), rows.Scan(), then rows.Err(). Used by the pre-warm fetch." },
+          // --- ops / scaling
+          { t: "Pre-warming", d: "Load the hot key set into L1 at startup so a fresh replica isn't cold. Capped by PREWARM_LIMIT so it never exhausts RAM." },
+          { t: "Thundering herd", d: "Many cold replicas all missing the same keys at once → a burst against Postgres. Pre-warming (and L2) absorb it." },
+          { t: "Keyset-fits-in-RAM", d: "The assumption that makes local caching work: the active keyset is small enough to replicate into each replica (~100 bytes/key). If it didn't fit, you'd need LRU eviction instead." },
+          { t: "Hit-rate instrumentation", d: "Per-replica atomic counters (L1/L2/miss) exposed at /v1/cache/stats — turns '~99% hit rate' from a claim into a measurement." }
+        ],
+        optimizations: [
+          { t: "L1 in-process cache", d: "Validate answered from a replica's own RAM (~0.2ms) instead of Postgres (~3ms). Measured: +52% rps (12k→18k), −41% p99 (17ms→10ms), 99.99% hit rate." },
+          { t: "L2 Redis cache (cross-replica)", d: "Shared tier behind L1. Demo: 287 L2 hits / 1500 (19%) across 2 cold replicas — roughly halved Postgres load by serving cross-replica misses from Redis." },
+          { t: "Pub/sub fleet-wide invalidation", d: "Revoke PUBLISHes the key hash; every replica SUBSCRIBEs and evicts from L1 in ms. Verified: revoked key flips 200→401 on BOTH replicas instantly, not after TTL." },
+          { t: "Negative caching (bad keys)", d: "Invalid results cached with a short TTL so bad-key floods don't reach Postgres." },
+          { t: "Capped pre-warm (PREWARM_LIMIT)", d: "Pre-warm only the top-N hot keys, bounded so it never exhausts RAM; PREWARM_LIMIT=0 gives a cold start for honest hit-rate measurement." },
+          { t: "Atomic counters for stats", d: "Lock-free hit/miss counters (atomic.Int64) — measurement with negligible hot-path cost." }
+        ]
       }
     ];
 
@@ -1146,8 +1189,8 @@
       { n: 'B', title: 'Tenants — schema and CRUD', desc: 'golang-migrate, pgxpool, POST /admin/tenants with X-Admin-Token auth. First persistent state.', status: 'done' },
       { n: 'C', title: 'API key issuance', desc: 'crypto/rand + base62 keys, HMAC+pepper hashing, POST /v1/tenants/{id}/keys, layered into internal/ packages.', status: 'done' },
       { n: 'D', title: '/validate slow path', desc: 'Postgres-only validation (Bearer auth, single-JOIN key+tenant check). Baseline: 12k rps @ p99 17ms (c=50).', status: 'done' },
-      { n: 'E', title: 'Redis cache layer', desc: 'Local in-process cache + Redis pub/sub invalidation. The mechanism that scales to 1M rps.', status: 'next' },
-      { n: 'F', title: 'Rate limiting', desc: 'Token bucket in Redis Lua. Integrate into /validate.', status: 'todo' },
+      { n: 'E', title: 'Cache layer (L1 + L2 + invalidation)', desc: 'In-process L1 + shared Redis L2 + pub/sub invalidation. Measured +52% rps, −41% p99, 99.99% hit rate.', status: 'done' },
+      { n: 'F', title: 'Rate limiting', desc: 'Token bucket in Redis Lua. Integrate into /validate.', status: 'next' },
       { n: 'G', title: 'Usage metering', desc: 'Counter increment + background flusher to Postgres rollups.', status: 'todo' },
       { n: 'H', title: 'Observability', desc: 'slog, /metrics (Prometheus), /healthz vs /readyz.', status: 'todo' },
       { n: 'I', title: 'keyservice-go middleware', desc: 'Drop-in package for other Go backends.', status: 'todo' },
