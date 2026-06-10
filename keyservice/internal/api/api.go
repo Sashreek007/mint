@@ -15,6 +15,7 @@ import (
 
 	"github.com/Sashreek007/mint/keyservice/internal/cache"
 	"github.com/Sashreek007/mint/keyservice/internal/keys"
+	"github.com/Sashreek007/mint/keyservice/internal/ratelimit"
 	"github.com/Sashreek007/mint/keyservice/internal/store"
 	"github.com/redis/go-redis/v9"
 )
@@ -31,6 +32,7 @@ type Server struct {
 	cache      *cache.Cache
 	l2         *cache.L2
 	rdb        *redis.Client
+	limiter    *ratelimit.Limiter
 	adminToken string
 	keyPepper  string
 	replicaID  string
@@ -40,8 +42,8 @@ type Server struct {
 	misses atomic.Int64
 }
 
-func New(st *store.Store, c *cache.Cache, l2 *cache.L2, rdb *redis.Client, adminToken, keyPepper, replicaID string) *Server {
-	return &Server{store: st, cache: c, l2: l2, rdb: rdb, adminToken: adminToken, keyPepper: keyPepper, replicaID: replicaID}
+func New(st *store.Store, c *cache.Cache, l2 *cache.L2, rdb *redis.Client, limiter *ratelimit.Limiter, adminToken, keyPepper, replicaID string) *Server {
+	return &Server{store: st, cache: c, l2: l2, rdb: rdb, limiter: limiter, adminToken: adminToken, keyPepper: keyPepper, replicaID: replicaID}
 }
 
 // Routes builds the router. All registration happens here, once — the lesson
@@ -169,7 +171,7 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 	// --- L1: in-process ---
 	if v, hit := s.cache.Get(cacheKey); hit {
 		s.l1Hits.Add(1)
-		s.writeValidateResult(w, v.(cache.Result))
+		s.writeValidateResult(w, r, cacheKey, v.(cache.Result))
 		return
 	}
 
@@ -177,7 +179,7 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 	if res, hit := s.l2.Get(ctx, cacheKey); hit {
 		s.l2Hits.Add(1)
 		s.cache.Set(cacheKey, res, ttlFor(res)) // backfill L1
-		s.writeValidateResult(w, res)
+		s.writeValidateResult(w, r, cacheKey, res)
 		return
 	}
 
@@ -199,7 +201,7 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 	// write through to both cache tiers
 	s.cache.Set(cacheKey, res, ttlFor(res))
 	s.l2.Set(ctx, cacheKey, res, ttlFor(res))
-	s.writeValidateResult(w, res)
+	s.writeValidateResult(w, r, cacheKey, res)
 }
 
 // ttlFor picks the TTL based on whether the result is valid.
@@ -210,8 +212,10 @@ func ttlFor(res cache.Result) time.Duration {
 	return ttlInvalid
 }
 
-func (s *Server) writeValidateResult(w http.ResponseWriter, res cache.Result) {
+func (s *Server) writeValidateResult(w http.ResponseWriter, r *http.Request, cacheKey string, res cache.Result) {
 	w.Header().Set("Content-Type", "application/json")
+
+	// invalid keys: 401, no rate-limit needed
 	if !res.Valid {
 		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(struct {
@@ -219,6 +223,18 @@ func (s *Server) writeValidateResult(w http.ResponseWriter, res cache.Result) {
 		}{false})
 		return
 	}
+
+	// valid key: must also be within its rate limit
+	if !s.limiter.Allow(r.Context(), s.rdb, cacheKey) {
+		w.WriteHeader(http.StatusTooManyRequests) // 429
+		_ = json.NewEncoder(w).Encode(struct {
+			Valid bool   `json:"valid"`
+			Error string `json:"error"`
+		}{true, "rate limit exceeded"})
+		return
+	}
+
+	// valid + within limit: 200
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(struct {
 		Valid    bool   `json:"valid"`

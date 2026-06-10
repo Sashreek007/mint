@@ -13,6 +13,7 @@ import (
 
 	"github.com/Sashreek007/mint/keyservice/internal/api"
 	"github.com/Sashreek007/mint/keyservice/internal/cache"
+	"github.com/Sashreek007/mint/keyservice/internal/ratelimit"
 	"github.com/Sashreek007/mint/keyservice/internal/store"
 )
 
@@ -47,7 +48,18 @@ func main() {
 			prewarmLimit = n
 		}
 	}
-
+	rateLimit := 100 // tokens/sec
+	if v := os.Getenv("RATE_LIMIT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			rateLimit = n
+		}
+	}
+	rateBurst := 200 // bucket capacity
+	if v := os.Getenv("RATE_BURST"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			rateBurst = n
+		}
+	}
 	// Shared 5s startup deadline for all dependency connects (redis + postgres).
 	startupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -105,7 +117,8 @@ func main() {
 		}
 	}
 	l2 := cache.NewL2(rdb)
-	srv := api.New(st, c, l2, rdb, adminToken, keyPepper, replicaID)
+	limiter := ratelimit.New(rateLimit, rateBurst) // 100 req/sec, burst 200, per key
+	srv := api.New(st, c, l2, rdb, limiter, adminToken, keyPepper, replicaID)
 
 	go cache.SubscribeRevocations(context.Background(), rdb, c)
 	addr := ":8080"

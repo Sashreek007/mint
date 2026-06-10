@@ -1130,6 +1130,35 @@
           { t: "Capped pre-warm (PREWARM_LIMIT)", d: "Pre-warm only the top-N hot keys, bounded so it never exhausts RAM; PREWARM_LIMIT=0 gives a cold start for honest hit-rate measurement." },
           { t: "Atomic counters for stats", d: "Lock-free hit/miss counters (atomic.Int64) — measurement with negligible hot-path cost." }
         ]
+      },
+      {
+        chunk: "F",
+        title: "Rate limiting · token bucket via Redis Lua",
+        concepts: [
+          { t: "Rate limit", d: "Cap on how FAST a key can call — e.g. 100 req/sec. Over the limit → 429. Protects fairness and capacity; distinct from quota (how MUCH total)." },
+          { t: "429 Too Many Requests", d: "The HTTP status for rate-limited. We return valid:true with it — the key IS valid, it's just over its limit (vs 401 = unknown key)." },
+          { t: "Token bucket", d: "Each key has a bucket of tokens; every request spends one; tokens refill at a steady rate; capacity caps bursts. Empty bucket → reject. Industry standard (AWS/Stripe/GitHub)." },
+          { t: "Burst capacity", d: "The bucket's max size. Lets a key briefly exceed the steady rate (spend saved-up tokens) — real traffic is bursty, so this is desirable." },
+          { t: "Refill rate", d: "Tokens added per second. Computed lazily from elapsed time on each request (tokens += elapsed × rate, capped at capacity) — no background timer needed." },
+          { t: "Bucket state", d: "Just two numbers per key in Redis: {tokens_left, last_refill_ts}, stored as a Redis hash. Tiny — scales to millions of keys." },
+          { t: "Why the state lives in Redis", d: "The bucket is shared across replicas. A per-replica bucket would let each replica allow the full limit → 2 replicas = 2× the intended rate. One shared bucket = correct global limit." },
+          { t: "Read-modify-write race", d: "Spending a token is read tokens → check → decrement → write. Done as separate calls, two requests can both read '1 left' and both proceed — over-admitting. Must be atomic." },
+          { t: "Redis is single-threaded", d: "Redis runs one command at a time, to completion. A single command is atomic — but several separate commands from a client can be interleaved with other clients' commands." },
+          { t: "Lua script atomicity", d: "Redis runs an entire Lua script as ONE command — start to finish, nothing interleaves. Bundling the whole read-modify-write into one script makes it atomic AND one round-trip." },
+          { t: "EVALSHA / script caching", d: "redis.NewScript sends a SHA hash after the first use; Redis caches the script by hash. Tiny per-call payload — full text only re-sent if the cache misses. go-redis handles this automatically." },
+          { t: "go:embed", d: "Go compile-time directive that bakes a file (bucket.lua) into the binary as a string. Script ships inside the image — no separate file to deploy, no runtime file-not-found." },
+          { t: "Fail open (vs fail closed)", d: "If Redis errors, the limiter ALLOWS the request. Rate limiting protects availability — blocking real customers over a Redis hiccup is worse than letting a few extra through. Opposite of auth, which fails closed." },
+          { t: "Lazy refill (no timer)", d: "Tokens aren't added by a background job ticking every second. Each request computes how many accrued since last_refill_ts. Cheap, stateless, exact." },
+          { t: "TTL on idle buckets", d: "Each bucket gets a short EXPIRE (~time to fully refill). Keys that go quiet self-clean from Redis — no memory leak from one-off keys." }
+        ],
+        optimizations: [
+          { t: "Atomic token bucket in one Lua script", d: "Entire read→refill→check→decrement→write runs as a single atomic Redis command — race-free across replicas, one network round-trip." },
+          { t: "Embedded Lua (go:embed) + EVALSHA", d: "Script compiled into the binary; sent as a SHA hash after first use → minimal payload on the hot path." },
+          { t: "Lazy time-based refill", d: "No background refill timer — tokens accrue from elapsed time on each call. Zero idle cost, exact rate." },
+          { t: "Fails open", d: "Redis unavailable → allow. Rate limiting degrades to 'no limiting' rather than blocking valid traffic — availability over strictness." },
+          { t: "Per-key buckets with auto-expiry", d: "Each key isolated; idle buckets TTL away so Redis memory stays bounded even with churny key sets." },
+          { t: "Env-configurable (RATE_LIMIT / RATE_BURST)", d: "Tune the limit without rebuilding; verified a 5/5 override yields exactly 5 allowed then 429s." }
+        ]
       }
     ];
 
@@ -1190,8 +1219,8 @@
       { n: 'C', title: 'API key issuance', desc: 'crypto/rand + base62 keys, HMAC+pepper hashing, POST /v1/tenants/{id}/keys, layered into internal/ packages.', status: 'done' },
       { n: 'D', title: '/validate slow path', desc: 'Postgres-only validation (Bearer auth, single-JOIN key+tenant check). Baseline: 12k rps @ p99 17ms (c=50).', status: 'done' },
       { n: 'E', title: 'Cache layer (L1 + L2 + invalidation)', desc: 'In-process L1 + shared Redis L2 + pub/sub invalidation. Measured +52% rps, −41% p99, 99.99% hit rate.', status: 'done' },
-      { n: 'F', title: 'Rate limiting', desc: 'Token bucket in Redis Lua. Integrate into /validate.', status: 'next' },
-      { n: 'G', title: 'Usage metering', desc: 'Counter increment + background flusher to Postgres rollups.', status: 'todo' },
+      { n: 'F', title: 'Rate limiting', desc: 'Token bucket via atomic Redis Lua script; per-key, fails open, env-configurable. 429 on overflow.', status: 'done' },
+      { n: 'G', title: 'Usage metering + quota', desc: 'Redis INCR counter + background flusher to Postgres; monthly quota check.', status: 'next' },
       { n: 'H', title: 'Observability', desc: 'slog, /metrics (Prometheus), /healthz vs /readyz.', status: 'todo' },
       { n: 'I', title: 'keyservice-go middleware', desc: 'Drop-in package for other Go backends.', status: 'todo' },
       { n: 'J', title: 'Demo product + integration tests', desc: 'End-to-end walkthrough, testcontainers-go.', status: 'todo' }
