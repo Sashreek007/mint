@@ -225,13 +225,21 @@ func (s *Server) writeValidateResult(w http.ResponseWriter, r *http.Request, cac
 		return
 	}
 
-	// valid key: must also be within its rate limit
-	if !s.limiter.Allow(r.Context(), s.rdb, cacheKey) {
+	//valid key: one Redis round-trip does rate-limit + quota + usage meter
+	switch s.limiter.Check(r.Context(), s.rdb, cacheKey, res.TenantID, res.MonthlyQuota) {
+	case ratelimit.RateLimited:
 		w.WriteHeader(http.StatusTooManyRequests) // 429
 		_ = json.NewEncoder(w).Encode(struct {
 			Valid bool   `json:"valid"`
 			Error string `json:"error"`
 		}{true, "rate limit exceeded"})
+		return
+	case ratelimit.QuotaExceeded:
+		w.WriteHeader(http.StatusTooManyRequests) // 429
+		_ = json.NewEncoder(w).Encode(struct {
+			Valid bool   `json:"valid"`
+			Error string `json:"error"`
+		}{true, "monthly quota exceeded"})
 		return
 	}
 
