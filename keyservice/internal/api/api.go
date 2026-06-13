@@ -71,7 +71,8 @@ func (s *Server) handleCreateTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Name string `json:"name"`
+		Name         string `json:"name"`
+		MonthlyQuota *int64 `json:"monthly_quota"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "invalid JSON")
@@ -82,7 +83,7 @@ func (s *Server) handleCreateTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenant, err := s.store.CreateTenant(r.Context(), req.Name)
+	tenant, err := s.store.CreateTenant(r.Context(), req.Name, req.MonthlyQuota)
 	if err != nil {
 		log.Printf("create tenant: %v", err)
 		writeJSONError(w, http.StatusInternalServerError, "internal error")
@@ -195,7 +196,7 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 		}
 		res = cache.Result{Valid: false}
 	} else {
-		res = cache.Result{Valid: true, TenantID: vk.TenantID, KeyID: vk.KeyID}
+		res = cache.Result{Valid: true, TenantID: vk.TenantID, KeyID: vk.KeyID, MonthlyQuota: vk.MonthlyQuota}
 	}
 
 	// write through to both cache tiers

@@ -34,22 +34,23 @@ func New(pool *pgxpool.Pool) *Store {
 // Tenant is the row shape returned to callers. JSON tags travel with it so the
 // api layer can encode it directly.
 type Tenant struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Status       string    `json:"status"`
+	MonthlyQuota *int64    `json:"monthly_quota,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // CreateTenant inserts a tenant and returns the created row.
 // (s *Store) makes this a METHOD on Store — s is the receiver, like self/this.
-func (s *Store) CreateTenant(ctx context.Context, name string) (Tenant, error) {
+func (s *Store) CreateTenant(ctx context.Context, name string, monthlyQuota *int64) (Tenant, error) {
 	var t Tenant
 	err := s.pool.QueryRow(ctx,
-		`INSERT INTO tenants (name)
-		 VALUES ($1)
-		 RETURNING id, name, status, created_at`,
-		name,
-	).Scan(&t.ID, &t.Name, &t.Status, &t.CreatedAt)
+		`INSERT INTO tenants (name,monthly_quota)
+		 VALUES ($1,$2)
+		 RETURNING id, name, status,monthly_quota, created_at`,
+		name, monthlyQuota,
+	).Scan(&t.ID, &t.Name, &t.Status, &t.MonthlyQuota, &t.CreatedAt)
 	return t, err
 }
 
@@ -90,8 +91,9 @@ func (s *Store) CreateAPIKey(ctx context.Context, tenantID, name, keyPrefix stri
 
 // ValidatesKey is the indentity returned when a key cheks out
 type ValidatedKey struct {
-	KeyID    string
-	TenantID string
+	KeyID        string
+	TenantID     string
+	MonthlyQuota int64
 }
 
 // ValidateKey looks up a key by its hash and confirms both the key and its tenant are active.
@@ -99,13 +101,13 @@ type ValidatedKey struct {
 func (s *Store) ValidateKey(ctx context.Context, keyHash []byte) (ValidatedKey, error) {
 	var vk ValidatedKey
 	err := s.pool.QueryRow(ctx,
-		`SELECT k.id, k.tenant_id
+		`SELECT k.id, k.tenant_id, COALESCE(t.monthly_quota,0)
 		FROM api_keys k 
 		JOIN tenants t ON t.id = k.tenant_id
 		WHERE k.key_hash = $1
 		AND k.status = 'active'
 		AND t.status = 'active'
-		`, keyHash).Scan(&vk.KeyID, &vk.TenantID)
+		`, keyHash).Scan(&vk.KeyID, &vk.TenantID, &vk.MonthlyQuota)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ValidatedKey{}, ErrKeyNotValid
@@ -138,16 +140,17 @@ func (s *Store) RevokeKey(ctx context.Context, keyID string) ([]byte, error) {
 
 // ActiveKey is one row for cache pre-warming: the hash plus who it belongs to.
 type ActiveKey struct {
-	KeyHash  []byte
-	KeyID    string
-	TenantID string
+	KeyHash      []byte
+	KeyID        string
+	TenantID     string
+	MonthlyQuota int64
 }
 
 // RecentActiveKeys returns up to limit active keys (tenant also active),
 // most-recently-used first — the hot set worth pre-warming into L1.
 func (s *Store) RecentActiveKeys(ctx context.Context, limit int) ([]ActiveKey, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT k.key_hash, k.id, k.tenant_id
+		`SELECT k.key_hash, k.id, k.tenant_id, COALESCE(t.monthly_quota,0)
 		   FROM api_keys k
 		   JOIN tenants  t ON t.id = k.tenant_id
 		  WHERE k.status = 'active' AND t.status = 'active'
@@ -163,7 +166,7 @@ func (s *Store) RecentActiveKeys(ctx context.Context, limit int) ([]ActiveKey, e
 	var out []ActiveKey
 	for rows.Next() {
 		var a ActiveKey
-		if err := rows.Scan(&a.KeyHash, &a.KeyID, &a.TenantID); err != nil {
+		if err := rows.Scan(&a.KeyHash, &a.KeyID, &a.TenantID, &a.MonthlyQuota); err != nil {
 			return nil, err
 		}
 		out = append(out, a)

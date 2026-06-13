@@ -7,9 +7,10 @@ import (
 
 // Result is a validation outcome, cached in L1 (as a value) and L2 (as JSON).
 type Result struct {
-	Valid    bool   `json:"valid"`
-	TenantID string `json:"tenant_id"`
-	KeyID    string `json:"key_id"`
+	Valid        bool   `json:"valid"`
+	TenantID     string `json:"tenant_id"`
+	KeyID        string `json:"key_id"`
+	MonthlyQuota int64  `json:"monthly_quota,omitempty"`
 }
 
 // entry is one caches value plus when it expires

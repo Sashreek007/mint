@@ -108,9 +108,10 @@ func main() {
 		} else {
 			for _, k := range keysList {
 				c.Set(string(k.KeyHash), cache.Result{
-					Valid:    true,
-					TenantID: k.TenantID,
-					KeyID:    k.KeyID,
+					Valid:        true,
+					TenantID:     k.TenantID,
+					KeyID:        k.KeyID,
+					MonthlyQuota: k.MonthlyQuota,
 				}, time.Hour) // long TTL; pub/sub evicts on revoke
 			}
 			log.Printf("prewarmed %d keys into L1", len(keysList))
