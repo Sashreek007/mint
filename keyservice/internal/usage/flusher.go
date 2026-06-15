@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Sashreek007/mint/keyservice/internal/store"
@@ -26,7 +25,7 @@ func NewFlusher(rdb *redis.Client, st *store.Store, replicaID string, interval t
 	return &Flusher{rdb: rdb, store: st, replicaID: replicaID, interval: interval}
 }
 
-// Run blocks, flushing once per interval until ctx is cancelled, Only the
+// Run blocks, flushing once per interval until ctx is cancelled. Only the
 // replica that wins the lease flushes each round; the others skip.
 func (f *Flusher) Run(ctx context.Context) {
 	ticker := time.NewTicker(f.interval)
@@ -51,9 +50,9 @@ func (f *Flusher) Run(ctx context.Context) {
 	}
 }
 
-// acquireLease grabs the once per leave flush lock. SET NX EX is atomic.
-// Exactly one replica wins, and the lock self-expires so a crashed leader cant
-// block forever. the flush is idempotent,
+// acquireLease grabs the once-per-interval flush lock. SET NX EX is atomic.
+// Exactly one replica wins, and the lock self-expires so a crashed leader can't
+// block forever. The flush is idempotent,
 // so this is an optimization (skip duplicate writes).
 func (f *Flusher) acquireLease(ctx context.Context) bool {
 	ok, err := f.rdb.SetNX(ctx, leaseKey, f.replicaID, f.interval).Result()
@@ -63,7 +62,7 @@ func (f *Flusher) acquireLease(ctx context.Context) bool {
 	return ok
 }
 
-// flushOnce reads every usafe counter from Redis and mirrors it to Postgres in
+// flushOnce reads every usage counter from Redis and mirrors it to Postgres in
 // one batched UPSERT. Returns how many counters were mirrored.
 func (f *Flusher) flushOnce(ctx context.Context) (int, error) {
 	// SCAN( never KEYS) for usage:* - non blocking, cursor based
@@ -85,7 +84,7 @@ func (f *Flusher) flushOnce(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	// Piar each key with its count, build the batch
+	// Pair each key with its count, build the batch
 	var rows []store.Usage
 	for i, key := range keys {
 		if vals[i] == nil {
@@ -100,7 +99,7 @@ func (f *Flusher) flushOnce(ctx context.Context) (int, error) {
 		if err != nil {
 			continue
 		}
-		rows = append(rows, store.Usage{tenantID: tenantID, Period: period, Count: count})
+		rows = append(rows, store.Usage{TenantID: tenantID, Period: period, Count: count})
 	}
 
 	//One batched UPSERT mirrors them all
@@ -113,7 +112,7 @@ func (f *Flusher) flushOnce(ctx context.Context) (int, error) {
 func toInt64(v any) (int64, error) {
 	s, ok := v.(string)
 	if !ok {
-		return 0, fmt.Errorf("usage valye not a string: %T", v)
+		return 0, fmt.Errorf("usage value not a string: %T", v)
 	}
 	return strconv.ParseInt(s, 10, 64)
 }
