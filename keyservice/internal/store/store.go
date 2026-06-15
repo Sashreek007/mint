@@ -41,6 +41,13 @@ type Tenant struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+// Usage is one tenant's request count for a period, mirrored from Redis.
+type Usage struct {
+	TenantID string
+	Period   string
+	Count    int64
+}
+
 // CreateTenant inserts a tenant and returns the created row.
 // (s *Store) makes this a METHOD on Store — s is the receiver, like self/this.
 func (s *Store) CreateTenant(ctx context.Context, name string, monthlyQuota *int64) (Tenant, error) {
@@ -172,4 +179,31 @@ func (s *Store) RecentActiveKeys(ctx context.Context, limit int) ([]ActiveKey, e
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+// UpsertUsage mirrors the live Redis counters into Postgres. It writes the
+// ABSOLUTE value (count = EXCLUDED.count), so re-running with the same numbers
+// is a no-op — that idempotency is what makes a double-flush harmless.
+func (s *Store) UpsertUsage(ctx context.Context, rows []Usage) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	batch := &pgx.Batch{}
+	for _, u := range rows {
+		batch.Queue(
+			`INSERT INTO usage_counters (tenant_id, period, count, updated_at)
+			 VALUES ($1, $2, $3, now())
+			 ON CONFLICT (tenant_id, period)
+			 DO UPDATE SET count = EXCLUDED.count, updated_at = now()`,
+			u.TenantID, u.Period, u.Count,
+		)
+	}
+	br := s.pool.SendBatch(ctx, batch)
+	defer br.Close()
+	for range rows {
+		if _, err := br.Exec(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

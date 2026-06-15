@@ -15,6 +15,7 @@ import (
 	"github.com/Sashreek007/mint/keyservice/internal/cache"
 	"github.com/Sashreek007/mint/keyservice/internal/ratelimit"
 	"github.com/Sashreek007/mint/keyservice/internal/store"
+	"github.com/Sashreek007/mint/keyservice/internal/usage"
 )
 
 func main() {
@@ -41,6 +42,12 @@ func main() {
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
 		log.Fatal("REDIS_URL is required")
+	}
+	flushInterval := 30 * time.Second
+	if v := os.Getenv("FLUSH_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			flushInterval = d
+		}
 	}
 	prewarmLimit := 1000 // default
 	if v := os.Getenv("PREWARM_LIMIT"); v != "" {
@@ -122,6 +129,8 @@ func main() {
 	srv := api.New(st, c, l2, rdb, limiter, adminToken, keyPepper, replicaID)
 
 	go cache.SubscribeRevocations(context.Background(), rdb, c)
+	flusher := usage.NewFlusher(rdb, st, replicaID, flushInterval)
+	go flusher.Run(context.Background())
 	addr := ":8080"
 	log.Printf("keyservice replica=%s listening on %s", replicaID, addr)
 	if err := http.ListenAndServe(addr, srv.Routes()); err != nil {
