@@ -38,11 +38,15 @@ func (f *Flusher) Run(ctx context.Context) {
 			if !f.acquireLease(ctx) {
 				continue
 			}
+			t0 := time.Now()
 			n, err := f.flushOnce(ctx)
+			flushDuration.Observe(float64(time.Since(t0).Seconds()))
 			if err != nil {
 				log.Printf("usage flush failed: %v", err)
 				continue
 			}
+			flushWrites.Add(float64(n))
+			flushTenants.Set(float64(n))
 			if n > 0 {
 				log.Printf("usage flush: mirrored %d counter(s) to postgres (replica=%s)", n, f.replicaID)
 			}

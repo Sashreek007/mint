@@ -25,6 +25,18 @@ var (
 		//default buckets are useless for this service, so using more dense buckets
 		Buckets: []float64{.0005, .001, .0025, .005, .01, .025, .05, .1, .25, .5, 1},
 	}, []string{"method", "route"})
+
+	// cache tier hit/miss on /validate — the 99.7% hit-rate story
+	validateCacheEvents = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "validate_cache_events_total",
+		Help: "Cache lookups on /validate by tier (l1, l2, miss).",
+	}, []string{"tier"})
+
+	// valid keys rejected after the gate — split by why
+	validateRejected = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "validate_rejected_total",
+		Help: "Valid keys rejected on /validate by reason (rate, quota).",
+	}, []string{"reason"})
 )
 
 //statusRecorder wraps http.ResponseWriter to capture the status code, which the

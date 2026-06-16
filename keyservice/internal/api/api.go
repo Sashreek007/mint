@@ -176,6 +176,7 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 	// --- L1: in-process ---
 	if v, hit := s.cache.Get(cacheKey); hit {
 		s.l1Hits.Add(1)
+		validateCacheEvents.WithLabelValues("l1").Inc()
 		s.writeValidateResult(w, r, cacheKey, v.(cache.Result))
 		return
 	}
@@ -183,6 +184,7 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 	// --- L2: Redis ---
 	if res, hit := s.l2.Get(ctx, cacheKey); hit {
 		s.l2Hits.Add(1)
+		validateCacheEvents.WithLabelValues("l2").Inc()
 		s.cache.Set(cacheKey, res, ttlFor(res)) // backfill L1
 		s.writeValidateResult(w, r, cacheKey, res)
 		return
@@ -190,6 +192,7 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 
 	// --- L3: Postgres (source of truth) ---
 	s.misses.Add(1)
+	validateCacheEvents.WithLabelValues("miss").Inc()
 	vk, err := s.store.ValidateKey(ctx, keyHash)
 	var res cache.Result
 	if err != nil {
@@ -232,6 +235,7 @@ func (s *Server) writeValidateResult(w http.ResponseWriter, r *http.Request, cac
 	//valid key: one Redis round-trip does rate-limit + quota + usage meter
 	switch s.limiter.Check(r.Context(), s.rdb, cacheKey, res.TenantID, res.MonthlyQuota) {
 	case ratelimit.RateLimited:
+		validateRejected.WithLabelValues("rate").Inc()
 		w.WriteHeader(http.StatusTooManyRequests) // 429
 		_ = json.NewEncoder(w).Encode(struct {
 			Valid bool   `json:"valid"`
@@ -239,6 +243,7 @@ func (s *Server) writeValidateResult(w http.ResponseWriter, r *http.Request, cac
 		}{true, "rate limit exceeded"})
 		return
 	case ratelimit.QuotaExceeded:
+		validateRejected.WithLabelValues("quota").Inc()
 		w.WriteHeader(http.StatusTooManyRequests) // 429
 		_ = json.NewEncoder(w).Encode(struct {
 			Valid bool   `json:"valid"`
