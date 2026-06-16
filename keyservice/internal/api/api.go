@@ -18,6 +18,7 @@ import (
 	"github.com/Sashreek007/mint/keyservice/internal/ratelimit"
 	"github.com/Sashreek007/mint/keyservice/internal/store"
 	"github.com/Sashreek007/mint/keyservice/internal/usage"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -58,7 +59,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /v1/keys/{id}/revoke", s.handleRevokeKey)
 	mux.HandleFunc("GET /v1/cache/stats", s.handleCacheStats)
 	mux.HandleFunc("GET /v1/tenants/{id}/usage", s.handleTenantUsage)
-	return mux
+	mux.Handle("GET /metrics", promhttp.Handler()) // ← expose the metrics page
+	return metricsMiddleware(mux)
 }
 
 func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
