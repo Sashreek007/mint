@@ -226,3 +226,7 @@ func (s *Store) GetTenantQuota(ctx context.Context, tenantID string) (*int64, er
 	}
 	return quota, nil
 }
+
+func (s *Store) Ping(ctx context.Context) error {
+	return s.pool.Ping(ctx)
+}

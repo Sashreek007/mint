@@ -3,6 +3,7 @@
 package api
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -59,6 +60,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /v1/keys/{id}/revoke", s.handleRevokeKey)
 	mux.HandleFunc("GET /v1/cache/stats", s.handleCacheStats)
 	mux.HandleFunc("GET /v1/tenants/{id}/usage", s.handleTenantUsage)
+	mux.HandleFunc("GET /readyz", s.handleReadyz)
 	mux.Handle("GET /metrics", promhttp.Handler()) // ← expose the metrics page
 	return metricsMiddleware(mux)
 }
@@ -345,10 +347,7 @@ func (s *Server) handleTenantUsage(w http.ResponseWriter, r *http.Request) {
 
 	var remaining *int64
 	if quota != nil {
-		rem := *quota - used
-		if rem < 0 {
-			rem = 0
-		}
+		rem := max(*quota-used, 0)
 		remaining = &rem
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -360,4 +359,24 @@ func (s *Server) handleTenantUsage(w http.ResponseWriter, r *http.Request) {
 		Quota     *int64 `json:"quota"`
 		Remaining *int64 `json:"remaining"`
 	}{tenantID, period, used, quota, remaining})
+}
+
+func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 800*time.Millisecond)
+	defer cancel()
+
+	pgOK := s.store.Ping(ctx) == nil
+	redisOK := s.rdb.Ping(ctx).Err() == nil
+
+	w.Header().Set("Content-Type", "application/json")
+	if pgOK && redisOK {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusServiceUnavailable) // 503 → out of rotation
+	}
+	_ = json.NewEncoder(w).Encode(struct {
+		Ready    bool `json:"ready"`
+		Postgres bool `json:"postgres"`
+		Redis    bool `json:"redis"`
+	}{pgOK && redisOK, pgOK, redisOK})
 }
