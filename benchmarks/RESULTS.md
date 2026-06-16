@@ -27,6 +27,7 @@ Where a target is not met on this hardware, the real value is reported as-is
 | `run.sh` (`hey`) | **peak** throughput + latency | one warm key — isolates raw request-handling speed |
 | `loadgen/` (Go) | **realistic** throughput + hit rate | many keys, Zipf-skewed traffic, 5% invalid — a real workload at real speed |
 | `realistic.py` | same as loadgen, but slow | Python fallback (~2.8k rps, tool-limited). Prefer the Go loadgen. |
+| `write_reduction.sh` (Go `loadgen` + `psql`) | **write reduction** (Target #3) | ~300 tenants (configurable via `KEYS`), all-valid load; counts Postgres writes vs requests |
 
 ---
 
@@ -67,6 +68,47 @@ of Postgres.
 > 10 cores, so c=200 is past the saturation knee (p99 balloons). c=50 is the
 > healthy operating point. The Python `realistic.py` reports the same hit rate but
 > only ~2.8k rps — it's tool-limited; the Go loadgen is the one to use.
+
+---
+
+## 3 — Usage-metering write reduction (Target #3)
+
+The hot path meters every request with a Redis `INCR`; a background flusher
+mirrors the live counters to Postgres once per `FLUSH_INTERVAL` (one batched
+UPSERT per active tenant). The database never sees a per-request write, so:
+
+```
+reduction = requests_served / postgres_writes = (rps × flush_interval) / active_tenants
+```
+
+The ratio is **not a constant** — it scales with traffic and flush cadence and
+inversely with tenant count. Two runs of `write_reduction.sh` (load via the Go
+`loadgen`, rate-limit + quota disabled to **isolate the metering pipeline** — rate
+limiting is Target #F, measured separately):
+
+| Scenario | tenants | flush | requests | PG writes | **reduction** |
+|---|---|---|---|---|---|
+| **Realistic** (the design operating point) | 300 | 30 s | 600,000 | 1,199 | **500×** |
+| Single-tenant (mechanism upper-bound) | 1 | 5 s | 500,000 | 12 | 41,666× |
+
+**Realistic run — the headline.** 300 tenants, Zipf-skewed traffic, 30 s flush:
+600,000 metered requests produced **1,199 Postgres writes** (≈ 300 tenants × ~4
+flushes over the 109 s run) → **500×**, matching the design target. This run:
+5,514 rps, p50 6.9 ms, p99 40 ms (not the latency benchmark — see §2).
+
+**Integrity check passes:** the 300 live Redis counters summed to **exactly
+600,000** = the metered request count. Every request counted once — no lost or
+double `INCR` under 50-way concurrency across 300 tenants (the atomic Lua `INCR`
+doing its job).
+
+**Why the single-tenant run shows 41,666×.** Same mechanism, different operating
+point: with one tenant the `active_tenants` denominator is tiny, so the ratio
+balloons. Both rows fall straight out of `(rps × flush_interval) / tenants`. The
+load-independent result is the real claim: **the hot path issues zero Postgres
+writes; metering writes are bounded by `tenants × flush_frequency`, fully
+decoupled from request volume — so the busier the service gets, the higher the
+ratio.** The ~500× target is simply the value at a mid-size-SaaS operating point
+(≈300 active tenants, 30 s flush), which the realistic run reproduces.
 
 ---
 
@@ -121,7 +163,9 @@ point is C=50 (the numbers above).
   contention for cores). On this laptop the honest measured value is 18k.
 - **Throughput is noisy on a laptop** (±~30%); 18,292 rps is a representative
   well-conditioned run.
-- Target **#3** (usage-metering write reduction) requires Chunk G — not yet built.
+- Target **#3** (usage-metering write reduction) — **built in Chunk G**, measured
+  **500×** at the realistic 300-tenant / 30 s-flush operating point (600k requests
+  → 1,199 Postgres writes); 41,666× single-tenant upper-bound. See §3.
 
 ## Reproduce
 
@@ -140,4 +184,10 @@ for c in $(docker compose ps -q keyservice); do \
   docker exec $c wget -qO- localhost:8080/v1/cache/stats; echo; done
 
 # repeat with -keys 10000 (flush + recreate first for a clean cold start)
+
+# usage-metering write reduction (Target #3) — realistic 300 tenants, 30s flush,
+# throttling off (to isolate the metering pipeline from rate limiting):
+RATE_LIMIT=100000000 RATE_BURST=100000000 FLUSH_INTERVAL=30s \
+  docker compose up -d --build --force-recreate keyservice
+./benchmarks/write_reduction.sh                 # KEYS=10 for single-tenant mechanism check
 ```
