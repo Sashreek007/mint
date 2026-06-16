@@ -1,6 +1,9 @@
 package usage
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 const Prefix = "usage:"
 
@@ -12,4 +15,14 @@ func ParseKey(key string) (period, tenantID string, ok bool) {
 		return "", "", false
 	}
 	return strings.Cut(rest, ":")
+}
+
+// CurrentPeriod is the month bucket in UTC
+func CurrentPeriod(now time.Time) string {
+	return now.UTC().Format("2006-01")
+}
+
+// Key builds the Redis counter key: usage:<period>:<tenant_id>
+func Key(period, tenantID string) string {
+	return Prefix + period + ":" + tenantID
 }

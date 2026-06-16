@@ -207,3 +207,22 @@ func (s *Store) UpsertUsage(ctx context.Context, rows []Usage) error {
 	}
 	return nil
 }
+
+// GetTenantQuota returns a tenant's monthly cap (nil = unlimited)
+func (s *Store) GetTenantQuota(ctx context.Context, tenantID string) (*int64, error) {
+	var quota *int64
+	err := s.pool.QueryRow(ctx,
+		`SELECT monthly_quota FROM tenants WHERE id = $1`, tenantID,
+	).Scan(&quota)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrTenantNotFound
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "22P02" {
+			return nil, ErrInvalidTenantID
+		}
+		return nil, err
+	}
+	return quota, nil
+}

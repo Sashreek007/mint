@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mint — Chunk G (G.1 → G.3a) Reconstructed</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --ink:#1f2733; --muted:#5b6675; --line:#e3e7ec;
+    --design:#2563eb; --design-bg:#eef4ff;
+    --logic:#7c3aed; --logic-bg:#f4eefe;
+    --gotcha:#d92d20; --gotcha-bg:#fdeeec;
+    --ok:#15803d; --ok-bg:#eaf6ee;
+    --code-bg:#0e1726; --code-ink:#d7e0ee; --code-mut:#7d8aa0;
+    --kw:#c792ea; --str:#c3e88d; --num:#f78c6c; --fn:#82aaff; --com:#5c6a82; --type:#ffcb6b;
+    --radius:12px; --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;font-size:15.5px}
+  .layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:0;max-width:1280px;margin:0 auto}
+  /* ---- sticky TOC ---- */
+  nav.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:24px 16px;border-right:1px solid var(--line);background:var(--panel)}
+  nav.toc h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;font-size:13.5px;padding:4px 10px;border-radius:7px;border-left:2px solid transparent}
+  nav.toc a:hover{background:#f0f3f7;color:var(--ink)}
+  nav.toc a.active{background:var(--design-bg);color:var(--design);border-left-color:var(--design);font-weight:600}
+  nav.toc .brand{font-weight:800;font-size:16px;color:var(--ink);margin-bottom:2px}
+  nav.toc .sub{font-size:12px;color:var(--muted);margin-bottom:6px}
+  /* ---- main ---- */
+  main{padding:34px 40px 120px;min-width:0}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:-.01em}
+  h1 + .lede{color:var(--muted);font-size:16px;margin:0 0 22px}
+  h2.section{font-size:23px;margin:46px 0 6px;padding-top:10px;letter-spacing:-.01em}
+  h3{font-size:17px;margin:26px 0 8px}
+  p{margin:10px 0}
+  code.inl{font-family:var(--mono);font-size:.86em;background:#eceff3;border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 9px;border-radius:999px;vertical-align:middle}
+  .pill.g1{background:#e7f0ff;color:#1d4ed8}.pill.g2{background:#fdeede;color:#b45309}.pill.g3{background:#e6f7ee;color:#15803d}.pill.plan{background:#eef0f3;color:#5b6675}
+  /* ---- legend ---- */
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 8px}
+  .legend .chip{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 12px}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  /* ---- layer cards ---- */
+  .layer{border:1px solid var(--line);border-left-width:4px;border-radius:var(--radius);padding:14px 18px;margin:14px 0;background:var(--panel)}
+  .layer .tag{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;display:inline-block;margin-bottom:4px}
+  .layer.design{border-left-color:var(--design);background:linear-gradient(0deg,var(--panel),var(--panel)),var(--design-bg)}
+  .layer.design .tag{color:var(--design)}
+  .layer.logic{border-left-color:var(--logic)}
+  .layer.logic .tag{color:var(--logic)}
+  .layer.gotcha{border-left-color:var(--gotcha);background:var(--gotcha-bg)}
+  .layer.gotcha .tag{color:var(--gotcha)}
+  .layer.ok{border-left-color:var(--ok);background:var(--ok-bg)}
+  .layer.ok .tag{color:var(--ok)}
+  .layer ul{margin:6px 0;padding-left:20px}.layer li{margin:4px 0}
+  /* ---- collapsible step ---- */
+  .step{border:1px solid var(--line);border-radius:var(--radius);margin:18px 0;background:var(--panel);overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  .step > summary{cursor:pointer;list-style:none;padding:16px 20px;display:flex;align-items:center;gap:12px;font-weight:700;font-size:16px;user-select:none}
+  .step > summary::-webkit-details-marker{display:none}
+  .step > summary .chev{margin-left:auto;transition:transform .2s;color:var(--muted)}
+  .step[open] > summary .chev{transform:rotate(90deg)}
+  .step > summary:hover{background:#fafbfc}
+  .step .body{padding:4px 22px 22px;border-top:1px solid var(--line)}
+  .step .num{width:26px;height:26px;border-radius:7px;background:var(--ink);color:#fff;font-size:13px;display:grid;place-items:center;font-weight:800;flex:none}
+  /* ---- code ---- */
+  .codewrap{margin:14px 0;border-radius:10px;overflow:hidden;border:1px solid #1c2638}
+  .codewrap .fname{background:#0a1120;color:#9fb0c9;font-family:var(--mono);font-size:12.5px;padding:8px 14px;border-bottom:1px solid #1c2638;display:flex;gap:8px;align-items:center}
+  .codewrap .fname .badge{margin-left:auto;font-size:10.5px;color:#6b7a95;text-transform:uppercase;letter-spacing:.06em}
+  pre{margin:0;background:var(--code-bg);color:var(--code-ink);padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.65;tab-size:4}
+  pre .c{color:var(--com);font-style:italic}
+  pre .k{color:var(--kw)} pre .s{color:var(--str)} pre .n{color:var(--num)} pre .f{color:var(--fn)} pre .t{color:var(--type)}
+  pre .mk{color:#0e1726;background:var(--type);border-radius:4px;padding:0 5px;font-weight:800;font-style:normal}
+  /* ---- line notes (the "margin annotations") ---- */
+  .notes{margin:10px 0 4px;border:1px dashed var(--line);border-radius:10px;padding:6px 6px 6px 0;background:#fbfcfe}
+  .notes .note{display:grid;grid-template-columns:34px 1fr;gap:10px;padding:7px 12px;border-bottom:1px solid #eef1f5;font-size:13.5px}
+  .notes .note:last-child{border-bottom:none}
+  .notes .note .m{justify-self:center;align-self:start;width:24px;height:24px;border-radius:6px;background:var(--type);color:#0e1726;font-weight:800;display:grid;place-items:center;font-size:12.5px}
+  .notes .note code{font-family:var(--mono);font-size:.92em;background:#eef1f5;border-radius:4px;padding:0 4px}
+  /* ---- API call deep-dive ---- */
+  .api{border:1px solid var(--line);border-radius:10px;margin:14px 0;background:var(--panel)}
+  .api .h{background:#101a2c;color:#cfe;border-radius:9px 9px 0 0;padding:9px 14px;font-family:var(--mono);font-size:13px}
+  .api .h b{color:#fff}
+  .api .rows{padding:6px 14px 12px}
+  .api .row{display:grid;grid-template-columns:120px 1fr;gap:10px;padding:7px 0;border-bottom:1px solid #f0f2f6;font-size:13.5px}
+  .api .row:last-child{border-bottom:none}
+  .api .row .lab{color:var(--muted);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .api .row code{font-family:var(--mono);font-size:.9em;background:#eef1f5;border-radius:4px;padding:0 4px}
+  /* ---- diagrams ---- */
+  figure{margin:18px 0;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:16px}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{color:var(--muted);font-size:13px;margin-top:10px;text-align:center}
+  .svgbg{fill:var(--panel)}
+  /* ---- misc ---- */
+  table.kv{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px}
+  table.kv th,table.kv td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  table.kv th{background:#f3f5f8;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .callout{display:flex;gap:10px;align-items:flex-start;background:#fff8e6;border:1px solid #f5e3a8;border-radius:10px;padding:12px 14px;margin:14px 0;font-size:14px}
+  .glossary dt{font-weight:700;margin-top:12px}.glossary dd{margin:2px 0 0;color:var(--muted)}
+  hr.soft{border:none;border-top:1px solid var(--line);margin:30px 0}
+  .crumbs{font-size:12.5px;color:var(--muted);margin-bottom:18px}
+  a.up{color:var(--design);text-decoration:none}
+  @media (max-width:880px){.layout{grid-template-columns:1fr}nav.toc{display:none}main{padding:24px 18px 80px}}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ============ STICKY TOC ============ -->
+<nav class="toc" id="toc">
+  <div class="brand">Mint · Chunk G</div>
+  <div class="sub">Usage metering + quota, reconstructed</div>
+  <a href="#top">Overview</a>
+  <a href="#arch">System map</a>
+  <a href="#hotpath">The hot path</a>
+  <h2>G.1 — schema + plumbing</h2>
+  <a href="#g1">Why quota rides the cache</a>
+  <a href="#g1-mig">① Migration 0003</a>
+  <a href="#g1-store">② store: read quota</a>
+  <a href="#g1-cache">③ cache.Result</a>
+  <a href="#g1-api">④ api + prewarm</a>
+  <h2>G.2 — combined Lua call</h2>
+  <a href="#g2">One round-trip, 3 jobs</a>
+  <a href="#g2-lua">① bucket.lua</a>
+  <a href="#g2-go">② ratelimit.Check</a>
+  <a href="#g2-api">③ verdict → HTTP</a>
+  <h2>G.3a — the flusher</h2>
+  <a href="#g3">Write coalescing</a>
+  <a href="#g3-keys">① usage/keys.go</a>
+  <a href="#g3-flush">② usage/flusher.go</a>
+  <a href="#g3-store">③ store.UpsertUsage</a>
+  <a href="#g3-main">④ main wiring</a>
+  <a href="#g3-cross">Cross-file map</a>
+  <h2>G.3b — usage endpoint</h2>
+  <a href="#g3b">Live present, durable past</a>
+  <a href="#g3b-keys">① usage key helpers</a>
+  <a href="#g3b-store">② store.GetTenantQuota</a>
+  <a href="#g3b-api">③ the handler + route</a>
+  <h2>Reference</h2>
+  <a href="#gotchas">Gotchas</a>
+  <a href="#glossary">Glossary</a>
+</nav>
+
+<!-- ============ MAIN ============ -->
+<main>
+  <span id="top"></span>
+  <div class="crumbs">mint / docs / chunk-g-explained.html — companion to <code class="inl">docs/design.html</code></div>
+  <h1>Chunk G, reconstructed bottom-up</h1>
+  <p class="lede">Usage metering + monthly quota, from the design down to the lines — built the way you'd write it yourself. Every block answers <b>“why does this exist?”</b> before <b>“what does it do?”</b>, across three layers: <span style="color:var(--design);font-weight:700">design</span> → <span style="color:var(--logic);font-weight:700">logic</span> → <span style="color:#0e1726;font-weight:700">code</span>.</p>
+
+  <div class="legend">
+    <span class="chip"><span class="dot" style="background:var(--design)"></span>System design — the <i>why</i></span>
+    <span class="chip"><span class="dot" style="background:var(--logic)"></span>Logic — the <i>how</i>, no syntax</span>
+    <span class="chip"><span class="dot" style="background:#0e1726"></span>Code — real lines</span>
+    <span class="chip"><span class="dot" style="background:var(--gotcha)"></span>Gotcha / tradeoff</span>
+    <span class="chip"><span class="dot" style="background:var(--type)"></span>Margin note marker</span>
+  </div>
+
+  <div class="layer design">
+    <span class="tag">The one-paragraph why</span>
+    Mint is a stateless Go service that other backends call on <b>every request</b> (<code class="inl">POST /v1/validate</code>) to check a key. Chunk G adds two things to that hot path: <b>metering</b> (count every served request, for billing) and <b>quota</b> (reject a tenant past its monthly cap). The hard constraint: at 5,000 rps you cannot write to Postgres per request. So G counts in <b>Redis</b> (atomic, in-memory) on the hot path and <b>batch-mirrors</b> the counts to Postgres in the background — the <b>~500× write-reduction</b> target. Auth still fails <i>closed</i>; metering/quota fail <i>open</i> (availability &gt; strictness).
+  </div>
+
+  <!-- ============ ARCHITECTURE ============ -->
+  <h2 class="section" id="arch">Where Chunk G lives in the system</h2>
+  <p>Green = added/changed in Chunk G. The validate handler now makes <i>one</i> Redis Lua call that gates <i>and</i> meters; a background goroutine drains the counters to Postgres.</p>
+  <figure>
+    <svg viewBox="0 0 980 460" font-family="var(--sans)" font-size="13">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+        <marker id="arg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#15803d"/></marker>
+      </defs>
+      <rect class="svgbg" x="0" y="0" width="980" height="460" rx="10" fill="#fff"/>
+      <!-- caller -->
+      <rect x="20" y="180" width="135" height="64" rx="9" fill="#eef2f7" stroke="#cbd5e1"/>
+      <text x="87" y="206" text-anchor="middle" font-weight="700">Downstream</text>
+      <text x="87" y="224" text-anchor="middle" fill="#5b6675">backend service</text>
+      <!-- nginx -->
+      <rect x="185" y="186" width="92" height="52" rx="9" fill="#eef2f7" stroke="#cbd5e1"/>
+      <text x="231" y="216" text-anchor="middle" font-weight="700">nginx</text>
+      <line x1="155" y1="212" x2="183" y2="212" stroke="#64748b" marker-end="url(#ar)"/>
+      <text x="170" y="204" text-anchor="middle" font-size="10" fill="#5b6675">/validate</text>
+      <!-- keyservice box -->
+      <rect x="305" y="40" width="360" height="380" rx="12" fill="#f8fafc" stroke="#94a3b8" stroke-dasharray="4 3"/>
+      <text x="485" y="62" text-anchor="middle" font-weight="800" fill="#334155">keyservice  (×2 replicas)</text>
+      <line x1="277" y1="212" x2="303" y2="212" stroke="#64748b" marker-end="url(#ar)"/>
+      <!-- validate handler -->
+      <rect x="325" y="80" width="320" height="58" rx="9" fill="#fff" stroke="#cbd5e1"/>
+      <text x="485" y="104" text-anchor="middle" font-weight="700">handleValidate → writeValidateResult</text>
+      <text x="485" y="122" text-anchor="middle" fill="#5b6675" font-size="11.5">L1 → L2 → L3, then the gate</text>
+      <!-- L1/L2 -->
+      <rect x="325" y="152" width="150" height="48" rx="9" fill="#fff" stroke="#cbd5e1"/>
+      <text x="400" y="172" text-anchor="middle" font-weight="700" font-size="12">cache L1 / L2</text>
+      <text x="400" y="189" text-anchor="middle" fill="#5b6675" font-size="11">+ MonthlyQuota</text>
+      <!-- ratelimit.Check -->
+      <rect x="495" y="152" width="150" height="48" rx="9" fill="#e6f7ee" stroke="#15803d"/>
+      <text x="570" y="172" text-anchor="middle" font-weight="700" font-size="12">ratelimit.Check</text>
+      <text x="570" y="189" text-anchor="middle" fill="#15803d" font-size="11">Lua: rate+quota+meter</text>
+      <!-- flusher -->
+      <rect x="325" y="320" width="320" height="80" rx="9" fill="#e6f7ee" stroke="#15803d"/>
+      <text x="485" y="346" text-anchor="middle" font-weight="800" fill="#166534">usage.Flusher  (goroutine)</text>
+      <text x="485" y="366" text-anchor="middle" fill="#166534" font-size="11.5">every ~30s · leader lease</text>
+      <text x="485" y="383" text-anchor="middle" fill="#166534" font-size="11.5">SCAN → MGET → batch UPSERT</text>
+      <line x1="485" y1="138" x2="485" y2="150" stroke="#64748b" marker-end="url(#ar)"/>
+      <line x1="570" y1="200" x2="570" y2="214" stroke="#15803d" marker-end="url(#arg)"/>
+      <!-- redis -->
+      <rect x="710" y="92" width="240" height="120" rx="11" fill="#fff" stroke="#dc2626"/>
+      <text x="830" y="116" text-anchor="middle" font-weight="800" fill="#b91c1c">Redis</text>
+      <text x="830" y="138" text-anchor="middle" font-size="11.5" fill="#475569">ratelimit:&lt;key&gt;  (bucket)</text>
+      <text x="830" y="157" text-anchor="middle" font-size="11.5" fill="#166534">usage:&lt;period&gt;:&lt;tenant&gt;</text>
+      <text x="830" y="176" text-anchor="middle" font-size="11.5" fill="#166534">lock:usage-flush  (lease)</text>
+      <text x="830" y="195" text-anchor="middle" font-size="11.5" fill="#475569">validate:&lt;key&gt;  (L2)</text>
+      <!-- postgres -->
+      <rect x="710" y="250" width="240" height="150" rx="11" fill="#fff" stroke="#2563eb"/>
+      <text x="830" y="274" text-anchor="middle" font-weight="800" fill="#1d4ed8">Postgres</text>
+      <text x="830" y="296" text-anchor="middle" font-size="11.5" fill="#475569">tenants  (+monthly_quota)</text>
+      <text x="830" y="315" text-anchor="middle" font-size="11.5" fill="#475569">api_keys</text>
+      <text x="830" y="334" text-anchor="middle" font-size="11.5" fill="#166534">usage_counters  (mirror)</text>
+      <text x="830" y="360" text-anchor="middle" font-size="11" fill="#94a3b8">source of truth</text>
+      <!-- arrows to deps -->
+      <line x1="645" y1="176" x2="708" y2="150" stroke="#15803d" marker-end="url(#arg)"/>
+      <text x="690" y="150" text-anchor="middle" font-size="10" fill="#15803d">EVALSHA</text>
+      <line x1="645" y1="360" x2="708" y2="200" stroke="#15803d" marker-end="url(#arg)"/>
+      <text x="700" y="300" text-anchor="middle" font-size="10" fill="#15803d" transform="rotate(-32 700 300)">SCAN+MGET</text>
+      <line x1="645" y1="375" x2="708" y2="335" stroke="#15803d" marker-end="url(#arg)"/>
+      <text x="688" y="372" text-anchor="middle" font-size="10" fill="#15803d">UPSERT</text>
+      <line x1="475" y1="110" x2="708" y2="300" stroke="#94a3b8" stroke-dasharray="3 3" marker-end="url(#ar)"/>
+      <text x="556" y="232" text-anchor="middle" font-size="10" fill="#64748b">L3 miss → Postgres</text>
+    </svg>
+    <figcaption>Chunk G additions in green. The gate (<code>ratelimit.Check</code>) and the meter share one Lua call; the flusher is a separate background path.</figcaption>
+  </figure>
+
+  <!-- ============ HOT PATH ============ -->
+  <h2 class="section" id="hotpath">The hot path: one request through the gate</h2>
+  <div class="layer logic">
+    <span class="tag">Logic — control flow</span>
+    Validate the key from cache (RAM first, Redis second, Postgres last). If invalid → <b>401</b> and stop (never spend a token, never meter). If valid → make <b>one</b> Lua call that checks the rate-limit bucket, then the monthly quota, and only if both pass does it spend a token and <code class="inl">INCR</code> the usage counter. The verdict maps to 200 / 429-rate / 429-quota.
+  </div>
+  <figure>
+    <svg viewBox="0 0 980 360" font-size="12.5">
+      <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>
+      <rect class="svgbg" x="0" y="0" width="980" height="360" rx="10" fill="#fff"/>
+      <rect x="20" y="150" width="120" height="50" rx="9" fill="#eef2f7" stroke="#cbd5e1"/><text x="80" y="172" text-anchor="middle" font-weight="700">/validate</text><text x="80" y="189" text-anchor="middle" font-size="10.5" fill="#5b6675">Bearer key</text>
+      <rect x="165" y="150" width="130" height="50" rx="9" fill="#fff" stroke="#cbd5e1"/><text x="230" y="172" text-anchor="middle" font-weight="700">hash → lookup</text><text x="230" y="189" text-anchor="middle" font-size="10.5" fill="#5b6675">L1→L2→L3</text>
+      <line x1="140" y1="175" x2="163" y2="175" stroke="#64748b" marker-end="url(#a2)"/>
+      <!-- valid? -->
+      <polygon points="345,175 390,150 435,175 390,200" fill="#fff" stroke="#cbd5e1"/><text x="390" y="179" text-anchor="middle" font-weight="700">valid?</text>
+      <line x1="295" y1="175" x2="343" y2="175" stroke="#64748b" marker-end="url(#a2)"/>
+      <rect x="345" y="285" width="90" height="44" rx="9" fill="#fdeeec" stroke="#d92d20"/><text x="390" y="312" text-anchor="middle" font-weight="800" fill="#b91c1c">401</text>
+      <line x1="390" y1="200" x2="390" y2="283" stroke="#64748b" marker-end="url(#a2)"/><text x="404" y="245" font-size="10.5" fill="#b91c1c">no</text>
+      <!-- Lua box -->
+      <rect x="470" y="40" width="270" height="280" rx="11" fill="#e6f7ee" stroke="#15803d" stroke-dasharray="4 3"/>
+      <text x="605" y="62" text-anchor="middle" font-weight="800" fill="#166534">one Lua call · ratelimit.Check</text>
+      <line x1="435" y1="175" x2="468" y2="120" stroke="#64748b" marker-end="url(#a2)"/><text x="452" y="135" font-size="10.5" fill="#15803d">yes</text>
+      <polygon points="500,110 560,86 620,110 560,134" fill="#fff" stroke="#15803d"/><text x="560" y="114" text-anchor="middle" font-weight="700" font-size="11.5">token≥1?</text>
+      <rect x="640" y="88" width="84" height="44" rx="9" fill="#fdeeec" stroke="#d92d20"/><text x="682" y="108" text-anchor="middle" font-weight="800" fill="#b91c1c" font-size="11">429</text><text x="682" y="123" text-anchor="middle" font-size="9.5" fill="#b91c1c">rate</text>
+      <line x1="620" y1="110" x2="638" y2="110" stroke="#64748b" marker-end="url(#a2)"/><text x="629" y="102" font-size="9.5" fill="#b91c1c">no</text>
+      <polygon points="500,180 560,156 620,180 560,204" fill="#fff" stroke="#15803d"/><text x="560" y="184" text-anchor="middle" font-weight="700" font-size="11.5">used&lt;quota?</text>
+      <line x1="560" y1="134" x2="560" y2="154" stroke="#64748b" marker-end="url(#a2)"/><text x="572" y="148" font-size="9.5" fill="#15803d">yes</text>
+      <rect x="640" y="158" width="84" height="44" rx="9" fill="#fdeeec" stroke="#d92d20"/><text x="682" y="178" text-anchor="middle" font-weight="800" fill="#b91c1c" font-size="11">429</text><text x="682" y="193" text-anchor="middle" font-size="9.5" fill="#b91c1c">quota</text>
+      <line x1="620" y1="180" x2="638" y2="180" stroke="#64748b" marker-end="url(#a2)"/><text x="629" y="172" font-size="9.5" fill="#b91c1c">no</text>
+      <rect x="495" y="232" width="220" height="70" rx="9" fill="#eaf6ee" stroke="#15803d"/>
+      <text x="605" y="256" text-anchor="middle" font-weight="800" fill="#166534">spend token + INCR usage</text>
+      <text x="605" y="276" text-anchor="middle" font-size="11" fill="#166534">return ALLOWED</text>
+      <line x1="560" y1="204" x2="560" y2="230" stroke="#64748b" marker-end="url(#a2)"/><text x="572" y="220" font-size="9.5" fill="#15803d">yes</text>
+      <rect x="800" y="245" width="90" height="44" rx="9" fill="#eaf6ee" stroke="#15803d"/><text x="845" y="272" text-anchor="middle" font-weight="800" fill="#166534">200</text>
+      <line x1="715" y1="267" x2="798" y2="267" stroke="#64748b" marker-end="url(#a2)"/>
+    </svg>
+    <figcaption>Rate-limit is checked <i>before</i> quota; only the fully-allowed (200) path meters. Rejected requests cost nothing.</figcaption>
+  </figure>
+
+  <!-- ============================================================ G.1 -->
+  <h2 class="section" id="g1">G.1 — schema + quota plumbing <span class="pill g1">done</span></h2>
+  <div class="layer design">
+    <span class="tag">Design — the contract</span>
+    The quota check happens on the hot path, so it must be <b>free to look up</b>. The naive way — query the tenant's quota from Postgres per request — would defeat the entire cache. <b>So the rule we lock in:</b> the quota value <i>rides inside the cached validation result</i>. We add a column to <code class="inl">tenants</code>, read it in the same JOIN <code class="inl">/validate</code> already runs, and store it next to <code class="inl">tenant_id</code> in L1/L2. The quota then costs zero extra lookups. G.1 builds none of the enforcement — it just lays this pipe end-to-end.
+  </div>
+  <div class="layer logic">
+    <span class="tag">Logic — the move</span>
+    <ul>
+      <li><b>Schema:</b> add <code class="inl">tenants.monthly_quota</code> (nullable; <code class="inl">NULL = unlimited</code>) and a <code class="inl">usage_counters</code> mirror table keyed <code class="inl">(tenant_id, period)</code>.</li>
+      <li><b>One convention:</b> map <code class="inl">NULL → 0</code> with <code class="inl">COALESCE</code> on the hot-path read, so Go always sees a plain <code class="inl">int64</code> where <code class="inl">0 = unlimited</code>. (The admin response keeps a real <code class="inl">*int64</code> so it can honestly show <code class="inl">null</code>.)</li>
+      <li><b>Carry it through:</b> <code class="inl">store.ValidateKey</code> → <code class="inl">cache.Result.MonthlyQuota</code> → prewarm. Tenant creation accepts an optional quota.</li>
+    </ul>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 980 150" font-size="12.5">
+      <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2563eb"/></marker></defs>
+      <rect class="svgbg" x="0" y="0" width="980" height="150" rx="10" fill="#fff"/>
+      <rect x="20" y="50" width="150" height="50" rx="9" fill="#eef4ff" stroke="#2563eb"/><text x="95" y="72" text-anchor="middle" font-weight="700">tenants table</text><text x="95" y="89" text-anchor="middle" font-size="10.5" fill="#475569">monthly_quota</text>
+      <rect x="220" y="50" width="170" height="50" rx="9" fill="#fff" stroke="#cbd5e1"/><text x="305" y="72" text-anchor="middle" font-weight="700">store.ValidateKey</text><text x="305" y="89" text-anchor="middle" font-size="10.5" fill="#475569">COALESCE(...,0)</text>
+      <rect x="440" y="50" width="170" height="50" rx="9" fill="#fff" stroke="#cbd5e1"/><text x="525" y="72" text-anchor="middle" font-weight="700">cache.Result</text><text x="525" y="89" text-anchor="middle" font-size="10.5" fill="#475569">MonthlyQuota int64</text>
+      <rect x="660" y="50" width="170" height="50" rx="9" fill="#e6f7ee" stroke="#15803d"/><text x="745" y="72" text-anchor="middle" font-weight="700">ratelimit.Check</text><text x="745" y="89" text-anchor="middle" font-size="10.5" fill="#166534">used in G.2</text>
+      <line x1="170" y1="75" x2="218" y2="75" stroke="#2563eb" marker-end="url(#a3)"/>
+      <line x1="390" y1="75" x2="438" y2="75" stroke="#2563eb" marker-end="url(#a3)"/>
+      <line x1="610" y1="75" x2="658" y2="75" stroke="#2563eb" marker-end="url(#a3)"/>
+      <text x="305" y="125" text-anchor="middle" font-size="11" fill="#64748b">int64 (0=unlimited) crosses every boundary</text>
+    </svg>
+    <figcaption>The quota value travels Postgres → store → cache → hot path. One <code>int64</code>, one convention (<code>0 = unlimited</code>).</figcaption>
+  </figure>
+
+  <details class="step" open id="g1-mig">
+    <summary><span class="num">1</span> Migration <code class="inl">0003_add_usage_and_quota</code> <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer design"><span class="tag">Why</span> Two durable facts must exist before any code: a place to store each tenant's cap, and a place to mirror the live Redis counters. <code class="inl">NULL</code> default = unlimited, because a metering service shouldn't impose a surprise cap.</div>
+      <div class="codewrap"><div class="fname">keyservice/migrations/0003_add_usage_and_quota.up.sql<span class="badge">SQL</span></div><pre><span class="c">-- per-tenant monthly request quota. NULL = unlimited</span>
+<span class="k">ALTER TABLE</span> tenants
+  <span class="k">ADD COLUMN</span> monthly_quota <span class="t">BIGINT</span> <span class="k">NULL</span>;
+
+<span class="c">-- durable mirror of the per-period usage counters that live hot in Redis.</span>
+<span class="c">-- the flusher UPSERTs the latest Redis value here every flush interval.</span>
+<span class="k">CREATE TABLE</span> usage_counters (
+  tenant_id  <span class="t">UUID</span>        <span class="k">NOT NULL</span> <span class="k">REFERENCES</span> tenants(id) <span class="k">ON DELETE CASCADE</span>,
+  period     <span class="t">TEXT</span>        <span class="k">NOT NULL</span>,                 <span class="c">-- 'YYYY-MM'</span>
+  count      <span class="t">BIGINT</span>      <span class="k">NOT NULL</span> <span class="k">DEFAULT</span> <span class="n">0</span>,
+  updated_at <span class="t">TIMESTAMPTZ</span> <span class="k">NOT NULL</span> <span class="k">DEFAULT</span> now(),
+  <span class="k">PRIMARY KEY</span> (tenant_id, period)
+);</pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">A</span><div><code>PRIMARY KEY (tenant_id, period)</code> — the composite key is what makes the flusher's <code>ON CONFLICT (tenant_id, period) DO UPDATE</code> work: exactly one row per tenant per month, upserted in place.</div></div>
+        <div class="note"><span class="m">B</span><div><code>ON DELETE CASCADE</code> — deleting a tenant auto-cleans its usage rows. (No delete-tenant endpoint exists yet, so this is forward-looking.)</div></div>
+      </div>
+      <div class="layer gotcha"><span class="tag">Gotcha caught</span> The first draft created <code class="inl">montly_quota</code> (missing the <i>h</i>) while every Go query referenced <code class="inl">monthly_quota</code>. SQL typos compile fine and explode at runtime — the column name is a contract between the migration and the queries.</div>
+    </div>
+  </details>
+
+  <details class="step" id="g1-store">
+    <summary><span class="num">2</span> <code class="inl">store</code>: read the quota on every path <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer design"><span class="tag">Why</span> <code class="inl">store</code> owns all SQL — nothing above it writes a query. So <i>every</i> read that produces a cacheable result must now also surface the quota: the hot-path <code class="inl">ValidateKey</code>, the prewarm <code class="inl">RecentActiveKeys</code>, and the admin <code class="inl">CreateTenant</code>.</div>
+      <div class="layer logic"><span class="tag">How</span> On the two hot/warm reads, use <code class="inl">COALESCE(t.monthly_quota, 0)</code> so the layer above always gets an <code class="inl">int64</code>. On <code class="inl">CreateTenant</code>, scan into a <code class="inl">*int64</code> instead — the admin response should show <code class="inl">null</code> for unlimited, not a fake <code class="inl">0</code>. <i>Different needs, different handling.</i></div>
+      <div class="codewrap"><div class="fname">keyservice/internal/store/store.go<span class="badge">Go · hot-path read</span></div><pre><span class="k">type</span> <span class="t">ValidatedKey</span> <span class="k">struct</span> {
+	KeyID        <span class="t">string</span>
+	TenantID     <span class="t">string</span>
+	MonthlyQuota <span class="t">int64</span>          <span class="mk">1</span>
+}
+
+<span class="k">func</span> (s *<span class="t">Store</span>) <span class="f">ValidateKey</span>(ctx <span class="t">context</span>.<span class="t">Context</span>, keyHash []<span class="t">byte</span>) (<span class="t">ValidatedKey</span>, <span class="t">error</span>) {
+	<span class="k">var</span> vk <span class="t">ValidatedKey</span>
+	err := s.pool.<span class="f">QueryRow</span>(ctx,
+		<span class="s">`SELECT k.id, k.tenant_id, COALESCE(t.monthly_quota,0)</span>     <span class="mk">2</span>
+<span class="s">		FROM api_keys k</span>
+<span class="s">		JOIN tenants t ON t.id = k.tenant_id</span>
+<span class="s">		WHERE k.key_hash = $1 AND k.status = 'active' AND t.status = 'active'`</span>,
+		keyHash).<span class="f">Scan</span>(&vk.KeyID, &vk.TenantID, &vk.MonthlyQuota)          <span class="mk">3</span>
+	<span class="k">if</span> err != <span class="k">nil</span> {
+		<span class="k">if</span> <span class="t">errors</span>.<span class="f">Is</span>(err, <span class="t">pgx</span>.ErrNoRows) {
+			<span class="k">return</span> <span class="t">ValidatedKey</span>{}, ErrKeyNotValid       <span class="c">// fail closed + quiet</span>
+		}
+		<span class="k">return</span> <span class="t">ValidatedKey</span>{}, err
+	}
+	<span class="k">return</span> vk, <span class="k">nil</span>
+}</pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">1</span><div>New field. <code>int64</code> not <code>*int64</code> here — the hot path wants a plain number, not a nil-check.</div></div>
+        <div class="note"><span class="m">2</span><div><code>COALESCE(t.monthly_quota, 0)</code> collapses <code>NULL → 0</code> <i>at the database</i>, so "unlimited" and "capped" arrive as the same Go type. One fewer branch on the path that runs 5,000×/s.</div></div>
+        <div class="note"><span class="m">3</span><div><code>Scan(&amp;...)</code> — pgx copies the row's columns into these pointers <i>in SELECT order</i>. Order must match: <code>id, tenant_id, quota</code> ↔ <code>KeyID, TenantID, MonthlyQuota</code>. A mismatch is a silent data bug, not a compile error.</div></div>
+      </div>
+      <div class="api">
+        <div class="h"><b>pool.QueryRow(ctx, sql, args...).Scan(dest...)</b> — pgx (go's Postgres driver)</div>
+        <div class="rows">
+          <div class="row"><span class="lab">does</span><div>Runs a query expected to return <b>one</b> row, over a pooled connection, and streams that row's columns into your destination variables. Single round-trip.</div></div>
+          <div class="row"><span class="lab">ctx</span><div>Cancellation/deadline. We pass <code>r.Context()</code> so a client disconnect cancels the in-flight query.</div></div>
+          <div class="row"><span class="lab">args...</span><div><code>$1, $2…</code> bound as <b>parameters</b> (not string-interpolated) — closes SQL injection and enables prepared-statement caching.</div></div>
+          <div class="row"><span class="lab">returns</span><div>A <code>Row</code>; <code>.Scan</code> returns <code>error</code>. <code>pgx.ErrNoRows</code> = no match (here → <code>ErrKeyNotValid</code>, fail closed). Any other error = real DB fault → bubble up as 500.</div></div>
+          <div class="row"><span class="lab">side effect</span><div>Network round-trip to Postgres; checks out and returns a pooled connection.</div></div>
+        </div>
+      </div>
+      <div class="codewrap"><div class="fname">keyservice/internal/store/store.go<span class="badge">Go · admin write</span></div><pre><span class="k">type</span> <span class="t">Tenant</span> <span class="k">struct</span> {
+	ID           <span class="t">string</span>    <span class="s">`json:"id"`</span>
+	Name         <span class="t">string</span>    <span class="s">`json:"name"`</span>
+	Status       <span class="t">string</span>    <span class="s">`json:"status"`</span>
+	MonthlyQuota *<span class="t">int64</span>    <span class="s">`json:"monthly_quota,omitempty"`</span>   <span class="mk">4</span>
+	CreatedAt    <span class="t">time</span>.<span class="t">Time</span> <span class="s">`json:"created_at"`</span>
+}
+
+<span class="k">func</span> (s *<span class="t">Store</span>) <span class="f">CreateTenant</span>(ctx <span class="t">context</span>.<span class="t">Context</span>, name <span class="t">string</span>, monthlyQuota *<span class="t">int64</span>) (<span class="t">Tenant</span>, <span class="t">error</span>) {
+	<span class="k">var</span> t <span class="t">Tenant</span>
+	err := s.pool.<span class="f">QueryRow</span>(ctx,
+		<span class="s">`INSERT INTO tenants (name, monthly_quota) VALUES ($1, $2)</span>
+<span class="s">		 RETURNING id, name, status, monthly_quota, created_at`</span>,             <span class="mk">5</span>
+		name, monthlyQuota,
+	).<span class="f">Scan</span>(&t.ID, &t.Name, &t.Status, &t.MonthlyQuota, &t.CreatedAt)
+	<span class="k">return</span> t, err
+}</pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">4</span><div><code>*int64</code> + <code>omitempty</code> — a nil pointer (NULL quota) drops the field from JSON entirely, so an unlimited tenant honestly shows <i>no</i> <code>monthly_quota</code>. pgx scans a nullable <code>BIGINT</code> into <code>*int64</code> by setting it to <code>nil</code> on NULL.</div></div>
+        <div class="note"><span class="m">5</span><div><code>INSERT … RETURNING</code> — one round-trip writes the row <i>and</i> reads back DB-generated columns (the UUID, timestamps). No INSERT-then-SELECT.</div></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" id="g1-cache">
+    <summary><span class="num">3</span> <code class="inl">cache.Result</code>: the field that rides along <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer design"><span class="tag">Why</span> <code class="inl">cache.Result</code> is the single value cached in L1 (as a Go value) and L2 (as JSON). Adding <code class="inl">MonthlyQuota</code> here is the whole trick: the quota now lives wherever the validation result lives, so the gate reads it for free.</div>
+      <div class="codewrap"><div class="fname">keyservice/internal/cache/cache.go<span class="badge">Go</span></div><pre><span class="c">// Result is a validation outcome, cached in L1 (as a value) and L2 (as JSON).</span>
+<span class="k">type</span> <span class="t">Result</span> <span class="k">struct</span> {
+	Valid        <span class="t">bool</span>   <span class="s">`json:"valid"`</span>
+	TenantID     <span class="t">string</span> <span class="s">`json:"tenant_id"`</span>
+	KeyID        <span class="t">string</span> <span class="s">`json:"key_id"`</span>
+	MonthlyQuota <span class="t">int64</span>  <span class="s">`json:"monthly_quota,omitempty"`</span>   <span class="mk">6</span>
+}</pre></div>
+      <div class="notes"><div class="note"><span class="m">6</span><div>Old L2 entries written before this field deserialize fine — a missing JSON field just leaves <code>MonthlyQuota</code> at its zero value <code>0</code> (= unlimited). No cache migration needed; the change is backward-compatible by construction.</div></div></div>
+    </div>
+  </details>
+
+  <details class="step" id="g1-api">
+    <summary><span class="num">4</span> <code class="inl">api</code> + <code class="inl">main</code>: accept it, carry it <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">How</span> Two tiny edits: the create-tenant handler reads an optional <code class="inl">monthly_quota</code> and passes it down; the validate L3-miss path copies the quota from <code class="inl">store</code>'s result into the <code class="inl">cache.Result</code> it's about to cache; and prewarm seeds it too so warm keys carry quota from boot.</div>
+      <div class="codewrap"><div class="fname">keyservice/internal/api/api.go<span class="badge">Go</span></div><pre><span class="c">// handleCreateTenant — widen the request, pass it through</span>
+<span class="k">var</span> req <span class="k">struct</span> {
+	Name         <span class="t">string</span> <span class="s">`json:"name"`</span>
+	MonthlyQuota *<span class="t">int64</span> <span class="s">`json:"monthly_quota"`</span>     <span class="mk">7</span>
+}
+<span class="c">// ...</span>
+tenant, err := s.store.<span class="f">CreateTenant</span>(r.<span class="f">Context</span>(), req.Name, req.MonthlyQuota)
+
+<span class="c">// handleValidate — on the L3 miss, carry quota into the cached result</span>
+} <span class="k">else</span> {
+	res = <span class="t">cache</span>.<span class="t">Result</span>{Valid: <span class="k">true</span>, TenantID: vk.TenantID, KeyID: vk.KeyID,
+		MonthlyQuota: vk.MonthlyQuota}                          <span class="mk">8</span>
+}</pre></div>
+      <div class="codewrap"><div class="fname">keyservice/main.go<span class="badge">Go · prewarm</span></div><pre>c.<span class="f">Set</span>(<span class="f">string</span>(k.KeyHash), <span class="t">cache</span>.<span class="t">Result</span>{
+	Valid:        <span class="k">true</span>,
+	TenantID:     k.TenantID,
+	KeyID:        k.KeyID,
+	MonthlyQuota: k.MonthlyQuota,        <span class="mk">9</span>
+}, <span class="t">time</span>.Hour)</pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">7</span><div><code>*int64</code> so an omitted field stays <code>nil</code> → DB stores NULL → unlimited. A present <code>0</code> would mean a real (impossible-to-meet) cap; a missing field means "no cap".</div></div>
+        <div class="note"><span class="m">8</span><div>This is the join point: <code>store.ValidatedKey.MonthlyQuota</code> (a hot read) crosses into <code>cache.Result.MonthlyQuota</code> (what gets cached). After this, every L1/L2 hit already has the quota.</div></div>
+        <div class="note"><span class="m">9</span><div>Prewarm seeds the same field, so keys loaded at boot also carry quota — no cold first-request penalty for the gate.</div></div>
+      </div>
+    </div>
+  </details>
+
+  <!-- ============================================================ G.2 -->
+  <h2 class="section" id="g2">G.2 — the combined Lua call <span class="pill g2">done</span></h2>
+  <div class="layer design">
+    <span class="tag">Design — the constraint that shapes everything</span>
+    The validate hot path already paid for <b>one</b> Redis round-trip in Chunk F (the token bucket). The locked-in decision: do <b>not</b> add a second round-trip for quota/metering — <b>bundle all three into the one Lua script</b>. Why Lua at all? Because rate-limit + quota + counter is a multi-step <i>read-modify-write</i> over <b>shared</b> state across replicas. Go locks can't coordinate two containers; Redis-side atomicity can. A Lua script runs atomically on Redis's single thread — no other command interleaves — so the whole gate is race-free in one shot.
+  </div>
+  <div class="layer logic">
+    <span class="tag">Logic — the algorithm & two embedded decisions</span>
+    <ul>
+      <li>Refill the bucket (lazy, time-based). If no token → return <b>RATE_LIMITED</b>, don't meter.</li>
+      <li>Else read the monthly counter. If <code class="inl">used &gt;= quota</code> → return <b>QUOTA_EXCEEDED</b>, don't meter.</li>
+      <li>Else spend a token, <code class="inl">INCR</code> the counter, return <b>ALLOWED</b>.</li>
+    </ul>
+    <b>Decision 1 — order:</b> rate-limit before quota, so a hammered key (429-rate) doesn't burn the tenant's monthly allowance. <b>Decision 2 — meter only on 200:</b> usage = <i>served</i> requests; rejected ones (401/429) never increment. That's the correct billing semantic.
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 980 250" font-size="12">
+      <defs><marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c3aed"/></marker></defs>
+      <rect class="svgbg" x="0" y="0" width="980" height="250" rx="10" fill="#fff"/>
+      <rect x="20" y="100" width="150" height="50" rx="9" fill="#f4eefe" stroke="#7c3aed"/><text x="95" y="122" text-anchor="middle" font-weight="700">HMGET bucket</text><text x="95" y="139" text-anchor="middle" font-size="10.5" fill="#5b6675">read tokens, ts</text>
+      <rect x="200" y="100" width="120" height="50" rx="9" fill="#fff" stroke="#cbd5e1"/><text x="260" y="122" text-anchor="middle" font-weight="700">refill</text><text x="260" y="139" text-anchor="middle" font-size="10.5" fill="#5b6675">+elapsed·rate</text>
+      <line x1="170" y1="125" x2="198" y2="125" stroke="#7c3aed" marker-end="url(#a4)"/>
+      <polygon points="350,125 405,100 460,125 405,150" fill="#fff" stroke="#7c3aed"/><text x="405" y="129" text-anchor="middle" font-weight="700">tokens&lt;1?</text>
+      <line x1="320" y1="125" x2="348" y2="125" stroke="#7c3aed" marker-end="url(#a4)"/>
+      <rect x="350" y="190" width="110" height="40" rx="8" fill="#fdeeec" stroke="#d92d20"/><text x="405" y="215" text-anchor="middle" font-weight="800" fill="#b91c1c">return 0</text>
+      <line x1="405" y1="150" x2="405" y2="188" stroke="#7c3aed" marker-end="url(#a4)"/><text x="416" y="172" font-size="10" fill="#b91c1c">yes</text>
+      <rect x="490" y="100" width="130" height="50" rx="9" fill="#fff" stroke="#cbd5e1"/><text x="555" y="122" text-anchor="middle" font-weight="700">GET usage</text><text x="555" y="139" text-anchor="middle" font-size="10.5" fill="#5b6675">used or 0</text>
+      <line x1="460" y1="125" x2="488" y2="125" stroke="#7c3aed" marker-end="url(#a4)"/><text x="475" y="116" font-size="10" fill="#7c3aed">no</text>
+      <polygon points="640,125 700,100 760,125 700,150" fill="#fff" stroke="#7c3aed"/><text x="700" y="129" text-anchor="middle" font-weight="700">used≥quota?</text>
+      <line x1="620" y1="125" x2="638" y2="125" stroke="#7c3aed" marker-end="url(#a4)"/>
+      <rect x="645" y="190" width="110" height="40" rx="8" fill="#fdeeec" stroke="#d92d20"/><text x="700" y="215" text-anchor="middle" font-weight="800" fill="#b91c1c">return 2</text>
+      <line x1="700" y1="150" x2="700" y2="188" stroke="#7c3aed" marker-end="url(#a4)"/><text x="711" y="172" font-size="10" fill="#b91c1c">yes</text>
+      <rect x="790" y="98" width="170" height="54" rx="9" fill="#eaf6ee" stroke="#15803d"/><text x="875" y="120" text-anchor="middle" font-weight="800" fill="#166534">token-- · INCR</text><text x="875" y="138" text-anchor="middle" font-size="10.5" fill="#166534">return 1 (ALLOWED)</text>
+      <line x1="760" y1="125" x2="788" y2="125" stroke="#15803d" marker-end="url(#a4)"/><text x="775" y="116" font-size="10" fill="#15803d">no</text>
+      <text x="490" y="40" font-weight="800" fill="#5b21b6">bucket.lua — atomic on Redis's single thread</text>
+      <text x="490" y="58" font-size="11" fill="#64748b">one EVALSHA from Go · HSET+EXPIRE the bucket once at the very end (all paths)</text>
+    </svg>
+    <figcaption>Returns 0/1/2. The bucket is written once at the end regardless of branch; only the green path touches the usage counter.</figcaption>
+  </figure>
+
+  <details class="step" open id="g2-lua">
+    <summary><span class="num">1</span> <code class="inl">bucket.lua</code> — the gate <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer design"><span class="tag">Why this file</span> The script is the only place where the three checks can be made atomic <i>and</i> shared across replicas. It's <code class="inl">go:embed</code>-ed into the binary and sent to Redis as a SHA hash (EVALSHA) after first use — tiny hot-path payload, no separate file to deploy.</div>
+      <div class="codewrap"><div class="fname">keyservice/internal/ratelimit/bucket.lua<span class="badge">Lua</span></div><pre><span class="c">-- KEYS[1]=bucket (per key)  KEYS[2]=usage counter (per tenant, per month)</span>
+<span class="c">-- ARGV: 1=rate 2=capacity 3=now(sec) 4=quota(&lt;=0 unlimited) 5=usage TTL(sec)</span>
+<span class="k">local</span> bucketKey = KEYS[<span class="n">1</span>]
+<span class="k">local</span> usageKey  = KEYS[<span class="n">2</span>]
+<span class="k">local</span> rate      = <span class="f">tonumber</span>(ARGV[<span class="n">1</span>])
+<span class="k">local</span> capacity  = <span class="f">tonumber</span>(ARGV[<span class="n">2</span>])
+<span class="k">local</span> now       = <span class="f">tonumber</span>(ARGV[<span class="n">3</span>])
+<span class="k">local</span> quota     = <span class="f">tonumber</span>(ARGV[<span class="n">4</span>])
+<span class="k">local</span> usage_ttl = <span class="f">tonumber</span>(ARGV[<span class="n">5</span>])
+
+<span class="c">-- read + refill the token bucket</span>
+<span class="k">local</span> state  = redis.<span class="f">call</span>(<span class="s">"HMGET"</span>, bucketKey, <span class="s">"tokens"</span>, <span class="s">"ts"</span>)     <span class="mk">1</span>
+<span class="k">local</span> tokens = <span class="f">tonumber</span>(state[<span class="n">1</span>])
+<span class="k">local</span> ts     = <span class="f">tonumber</span>(state[<span class="n">2</span>])
+<span class="k">if</span> tokens == <span class="k">nil</span> <span class="k">then</span> tokens = capacity; ts = now <span class="k">end</span>     <span class="mk">2</span>
+<span class="k">local</span> elapsed = math.<span class="f">max</span>(<span class="n">0</span>, now - ts)
+tokens = math.<span class="f">min</span>(capacity, tokens + elapsed * rate)        <span class="mk">3</span>
+ts = now
+
+<span class="c">-- decide the verdict</span>
+<span class="k">local</span> status
+<span class="k">if</span> tokens &lt; <span class="n">1</span> <span class="k">then</span>
+	status = <span class="n">0</span>                                              <span class="mk">4</span>
+<span class="k">else</span>
+	<span class="k">local</span> used = <span class="f">tonumber</span>(redis.<span class="f">call</span>(<span class="s">"GET"</span>, usageKey)) <span class="k">or</span> <span class="n">0</span>   <span class="mk">5</span>
+	<span class="k">if</span> quota &gt; <span class="n">0</span> <span class="k">and</span> used &gt;= quota <span class="k">then</span>
+		status = <span class="n">2</span>                                          <span class="mk">6</span>
+	<span class="k">else</span>
+		tokens = tokens - <span class="n">1</span>
+		<span class="k">local</span> newused = redis.<span class="f">call</span>(<span class="s">"INCR"</span>, usageKey)         <span class="mk">7</span>
+		<span class="k">if</span> newused == <span class="n">1</span> <span class="k">then</span> redis.<span class="f">call</span>(<span class="s">"EXPIRE"</span>, usageKey, usage_ttl) <span class="k">end</span>  <span class="mk">8</span>
+		status = <span class="n">1</span>
+	<span class="k">end</span>
+<span class="k">end</span>
+
+<span class="c">-- persist the bucket once (refill always; decrement only if allowed)</span>
+redis.<span class="f">call</span>(<span class="s">"HSET"</span>, bucketKey, <span class="s">"tokens"</span>, tokens, <span class="s">"ts"</span>, ts)   <span class="mk">9</span>
+redis.<span class="f">call</span>(<span class="s">"EXPIRE"</span>, bucketKey, math.<span class="f">ceil</span>(capacity / rate) + <span class="n">1</span>)
+<span class="k">return</span> status</pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">1</span><div><code>HMGET</code> = hash multi-get: read several fields of one hash in one call, returned <i>in order</i>. The bucket is a hash <code>{tokens, ts}</code> — two related numbers grouped under one key.</div></div>
+        <div class="note"><span class="m">2</span><div><code>nil</code> = first-ever request for this key → start the bucket full. (Reading a missing hash field returns <code>nil</code>; that's our "new bucket" signal.)</div></div>
+        <div class="note"><span class="m">3</span><div>Lazy refill: tokens accrue from <i>elapsed time</i>, capped at capacity. No background timer, zero idle cost — the token-bucket algorithm.</div></div>
+        <div class="note"><span class="m">4</span><div>No token → <code>RATE_LIMITED</code>. Note we fall through to the single bucket-write at the bottom (the refill must persist).</div></div>
+        <div class="note"><span class="m">5</span><div><code>GET … or 0</code> — a never-seen counter is <code>nil</code>; treat as 0. We check <i>before</i> incrementing, so the boundary is exact (the (quota+1)th request is the first rejected).</div></div>
+        <div class="note"><span class="m">6</span><div><code>quota &gt; 0</code> guards the unlimited case (0 = unlimited). Over cap → <code>QUOTA_EXCEEDED</code>, and crucially <b>no INCR</b> — rejected requests aren't billed.</div></div>
+        <div class="note"><span class="m">7</span><div><code>INCR</code> = atomic +1 on a string-as-integer, returns the new value. This single command is the heart of metering: correct shared counting across both replicas with no Go locks.</div></div>
+        <div class="note"><span class="m">8</span><div>Set the TTL <b>only</b> on the first INCR (<code>newused == 1</code>) — the key is born with "until month-end + grace" and we never reset it. Self-cleaning → bounded Redis memory.</div></div>
+        <div class="note"><span class="m">9</span><div>One bucket write for every branch — DRY, and mirrors the original Chunk-F structure so the diff is minimal.</div></div>
+      </div>
+      <div class="api">
+        <div class="h"><b>redis.call(cmd, key, args...)</b> — Redis server-side Lua</div>
+        <div class="rows">
+          <div class="row"><span class="lab">does</span><div>Invokes a Redis command from inside the script and returns its reply as a Lua value. Runs in-process on Redis's single thread — <b>nothing else interleaves</b> for the whole script (atomic).</div></div>
+          <div class="row"><span class="lab">edge</span><div>Reading an <b>undefined global</b> (e.g. a typo'd variable name) raises a hard error and aborts the script — exactly the bug we hit with <code>bucketKey</code> vs <code>key</code>.</div></div>
+          <div class="row"><span class="lab">no rollback</span><div>If the script errors after a write (e.g. after INCR), Redis does <b>not</b> roll back. Combined with fail-open in Go, that produced the silent "always 200" symptom.</div></div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" id="g2-go">
+    <summary><span class="num">2</span> <code class="inl">ratelimit.Check</code> — Go side of the call <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer design"><span class="tag">Why</span> Lua shouldn't do calendar math. Go computes the period string, the usage key, and the key's TTL, then hands them to the script. <code class="inl">Allow</code> (boolean) became <code class="inl">Check</code> (a 3-way <code class="inl">Verdict</code>). Still <b>fails open</b> — a Redis error returns <code class="inl">Allowed</code> (availability &gt; strictness).</div>
+      <div class="codewrap"><div class="fname">keyservice/internal/ratelimit/ratelimit.go<span class="badge">Go</span></div><pre><span class="k">type</span> <span class="t">Verdict</span> <span class="k">int</span>
+<span class="k">const</span> ( Allowed <span class="t">Verdict</span> = <span class="k">iota</span>; RateLimited; QuotaExceeded )   <span class="mk">1</span>
+
+<span class="k">const</span> usageGrace = <span class="n">48</span> * <span class="t">time</span>.Hour                              <span class="mk">2</span>
+
+<span class="k">func</span> (l *<span class="t">Limiter</span>) <span class="f">Check</span>(ctx <span class="t">context</span>.<span class="t">Context</span>, rdb *<span class="t">redis</span>.<span class="t">Client</span>,
+                         keyHash, tenantID <span class="t">string</span>, quota <span class="t">int64</span>) <span class="t">Verdict</span> {
+	now := <span class="t">time</span>.<span class="f">Now</span>().<span class="f">UTC</span>()                                  <span class="mk">3</span>
+	period := now.<span class="f">Format</span>(<span class="s">"2006-01"</span>)                         <span class="c">// "2026-06"</span>
+	firstOfNext := <span class="t">time</span>.<span class="f">Date</span>(now.<span class="f">Year</span>(), now.<span class="f">Month</span>()+<span class="n">1</span>, <span class="n">1</span>, <span class="n">0</span>,<span class="n">0</span>,<span class="n">0</span>,<span class="n">0</span>, <span class="t">time</span>.UTC)  <span class="mk">4</span>
+	usageTTL := <span class="f">int</span>(firstOfNext.<span class="f">Sub</span>(now).<span class="f">Seconds</span>()) + <span class="f">int</span>(usageGrace.<span class="f">Seconds</span>())
+	usageKey := <span class="s">"usage:"</span> + period + <span class="s">":"</span> + tenantID
+
+	nowSec := <span class="f">float64</span>(now.<span class="f">UnixNano</span>()) / <span class="n">1e9</span>
+	res, err := l.script.<span class="f">Run</span>(ctx, rdb,
+		[]<span class="t">string</span>{<span class="s">"ratelimit:"</span> + keyHash, usageKey},          <span class="mk">5</span>
+		l.rate, l.capacity, nowSec, quota, usageTTL,            <span class="c">// ARGV[1..5]</span>
+	).<span class="f">Int</span>()
+	<span class="k">if</span> err != <span class="k">nil</span> { <span class="k">return</span> Allowed }                          <span class="mk">6</span>
+	<span class="k">switch</span> res {                                              <span class="mk">7</span>
+	<span class="k">case</span> <span class="n">0</span>: <span class="k">return</span> RateLimited
+	<span class="k">case</span> <span class="n">2</span>: <span class="k">return</span> QuotaExceeded
+	<span class="k">default</span>: <span class="k">return</span> Allowed
+	}
+}</pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">1</span><div><code>iota</code> auto-numbers a const block: <code>Allowed=0, RateLimited=1, QuotaExceeded=2</code>, all type <code>Verdict</code>. Idiomatic Go enum. <b>These do not match the Lua numbers</b> — the switch ⑦ is the bridge.</div></div>
+        <div class="note"><span class="m">2</span><div>48h grace so the counter outlives month-end long enough for the flusher to mirror its final value before Redis drops it.</div></div>
+        <div class="note"><span class="m">3</span><div><code>.UTC()</code> — both replicas must agree on which month it is. Local time would split the period at a boundary.</div></div>
+        <div class="note"><span class="m">4</span><div><code>time.Date(year, month+1, 1, …)</code> — Go <b>normalizes</b> month 13 → next year's January, so end-of-month works even in December.</div></div>
+        <div class="note"><span class="m">5</span><div>Two KEYS cross into Lua: the per-key bucket and the per-tenant counter. (Single Redis; in Cluster you'd hash-tag them to one slot.)</div></div>
+        <div class="note"><span class="m">6</span><div><b>Fail open.</b> Redis down → allow. The gate degrades to "no limit" rather than taking the whole service down.</div></div>
+        <div class="note"><span class="m">7</span><div>Translate the Lua wire format (0/1/2) into the Go enum. Keeps the two numbering schemes decoupled.</div></div>
+      </div>
+      <div class="api">
+        <div class="h"><b>script.Run(ctx, rdb, keys, args...).Int()</b> — go-redis scripting</div>
+        <div class="rows">
+          <div class="row"><span class="lab">does</span><div>Executes the embedded Lua. First tries <code>EVALSHA</code> (send only the script's SHA); if Redis doesn't know it yet, falls back to <code>EVAL</code> (send full source) and caches it. So after the first call it's a tiny payload.</div></div>
+          <div class="row"><span class="lab">keys / args</span><div><code>[]string</code> → <code>KEYS[]</code> in Lua; the variadic <code>args</code> → <code>ARGV[]</code>. go-redis stringifies numbers; Lua <code>tonumber</code>s them back.</div></div>
+          <div class="row"><span class="lab">.Int()</span><div>Coerces the reply to a Go <code>int</code>. Returns <code>(int, error)</code>; a Redis/network error lands in <code>err</code> → fail open.</div></div>
+          <div class="row"><span class="lab">side effect</span><div>One network round-trip; mutates the bucket and (on allow) the counter atomically.</div></div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" id="g2-api">
+    <summary><span class="num">3</span> <code class="inl">writeValidateResult</code> — verdict → HTTP <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">How</span> An <code class="inl">if rate-limited</code> became a <code class="inl">switch</code> over the verdict. Invalid → 401 (before the gate). Rate → 429 "rate limit exceeded". Quota → 429 "monthly quota exceeded". Else → 200.</div>
+      <div class="codewrap"><div class="fname">keyservice/internal/api/api.go<span class="badge">Go</span></div><pre><span class="c">// valid key: one Redis round-trip does rate-limit + quota + usage meter</span>
+<span class="k">switch</span> s.limiter.<span class="f">Check</span>(r.<span class="f">Context</span>(), s.rdb, cacheKey, res.TenantID, res.MonthlyQuota) {  <span class="mk">1</span>
+<span class="k">case</span> <span class="t">ratelimit</span>.RateLimited:
+	w.<span class="f">WriteHeader</span>(<span class="t">http</span>.StatusTooManyRequests)               <span class="c">// 429</span>
+	_ = <span class="t">json</span>.<span class="f">NewEncoder</span>(w).<span class="f">Encode</span>(<span class="k">struct</span>{Valid <span class="t">bool</span> <span class="s">`json:"valid"`</span>; Error <span class="t">string</span> <span class="s">`json:"error"`</span>}{<span class="k">true</span>, <span class="s">"rate limit exceeded"</span>})
+	<span class="k">return</span>
+<span class="k">case</span> <span class="t">ratelimit</span>.QuotaExceeded:
+	w.<span class="f">WriteHeader</span>(<span class="t">http</span>.StatusTooManyRequests)               <span class="c">// 429</span>
+	_ = <span class="t">json</span>.<span class="f">NewEncoder</span>(w).<span class="f">Encode</span>(<span class="k">struct</span>{Valid <span class="t">bool</span> <span class="s">`json:"valid"`</span>; Error <span class="t">string</span> <span class="s">`json:"error"`</span>}{<span class="k">true</span>, <span class="s">"monthly quota exceeded"</span>})
+	<span class="k">return</span>
+}
+<span class="c">// allowed: 200</span>
+w.<span class="f">WriteHeader</span>(<span class="t">http</span>.StatusOK)
+_ = <span class="t">json</span>.<span class="f">NewEncoder</span>(w).<span class="f">Encode</span>(...{Valid:<span class="k">true</span>, TenantID:res.TenantID, KeyID:res.KeyID})</pre></div>
+      <div class="notes"><div class="note"><span class="m">1</span><div><code>cacheKey</code> = the key hash (per-key bucket); <code>res.TenantID</code> + <code>res.MonthlyQuota</code> come from the cached <code>Result</code> — the G.1 plumbing paying off. Same status (429) for both throttles, distinct error strings so the client can tell "retry later" from "capped this month".</div></div></div>
+      <div class="callout"><span>✅</span><div><b>Verified:</b> quota=5 → <code class="inl">200 200 200 200 200 429 429</code>, Redis counter sat at <b>5</b> (the two rejected requests weren't metered).</div></div>
+    </div>
+  </details>
+
+  <!-- ============================================================ G.3a -->
+  <h2 class="section" id="g3">G.3a — the background flusher <span class="pill g3">in progress</span></h2>
+  <div class="layer design">
+    <span class="tag">Design — write coalescing</span>
+    The counter is live in Redis but <b>volatile</b> (lost on restart). G.3a builds the goroutine that <b>mirrors</b> it to Postgres every ~30s, so it survives crashes and becomes queryable history. This is <b>write coalescing</b>: instead of one Postgres write per request (~5k/s), Postgres sees ~one write <i>per tenant per interval</i> — the ~500× reduction (Target #3). The mirror is <b>Fork A</b>: Redis holds the absolute monthly total; the flush overwrites Postgres with that value (idempotent), which is what lets the quota check stay a single cheap Redis read.
+  </div>
+  <div class="layer logic">
+    <span class="tag">Logic — three moves</span>
+    <ul>
+      <li><b>List safely:</b> <code class="inl">SCAN usage:*</code> (cursor-based, non-blocking) — never <code class="inl">KEYS</code>.</li>
+      <li><b>Move in bulk:</b> <code class="inl">MGET</code> all counts in one round-trip, then one <b>batched UPSERT</b> to Postgres.</li>
+      <li><b>Do it once:</b> a Redis <code class="inl">SET NX EX</code> <b>lease</b> so only one replica flushes per round.</li>
+    </ul>
+  </div>
+
+  <div class="callout"><span>⏳</span><div><b>Status on disk:</b> <code class="inl">usage/keys.go</code> ✅ written. <code class="inl">usage/flusher.go</code> ⚠️ stub (struct + <code class="inl">NewFlusher</code> only — <code class="inl">Run/acquireLease/flushOnce/toInt64</code> missing → won't build). <code class="inl">store.UpsertUsage</code>, <code class="inl">main</code> wiring, and the compose env are ❌ not written. The code below is the <b>target</b> for finishing G.3a.</div></div>
+
+  <figure>
+    <svg viewBox="0 0 980 270" font-size="12">
+      <defs><marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#15803d"/></marker></defs>
+      <rect class="svgbg" x="0" y="0" width="980" height="270" rx="10" fill="#fff"/>
+      <rect x="20" y="105" width="120" height="52" rx="9" fill="#e6f7ee" stroke="#15803d"/><text x="80" y="127" text-anchor="middle" font-weight="700">ticker</text><text x="80" y="144" text-anchor="middle" font-size="10.5" fill="#166534">every interval</text>
+      <polygon points="170,131 235,103 300,131 235,159" fill="#fff" stroke="#15803d"/><text x="235" y="128" text-anchor="middle" font-weight="700" font-size="11">SET NX EX?</text><text x="235" y="144" text-anchor="middle" font-size="9.5" fill="#5b6675">lease won?</text>
+      <line x1="140" y1="131" x2="168" y2="131" stroke="#15803d" marker-end="url(#a5)"/>
+      <rect x="195" y="205" width="80" height="38" rx="8" fill="#f1f5f9" stroke="#94a3b8"/><text x="235" y="229" text-anchor="middle" font-size="11" fill="#475569">skip</text>
+      <line x1="235" y1="159" x2="235" y2="203" stroke="#94a3b8" marker-end="url(#a5)"/><text x="246" y="184" font-size="9.5" fill="#94a3b8">no</text>
+      <rect x="335" y="105" width="120" height="52" rx="9" fill="#fff" stroke="#cbd5e1"/><text x="395" y="127" text-anchor="middle" font-weight="700">SCAN usage:*</text><text x="395" y="144" text-anchor="middle" font-size="10.5" fill="#5b6675">collect keys</text>
+      <line x1="300" y1="131" x2="333" y2="131" stroke="#15803d" marker-end="url(#a5)"/><text x="315" y="122" font-size="9.5" fill="#15803d">yes</text>
+      <rect x="485" y="105" width="120" height="52" rx="9" fill="#fff" stroke="#cbd5e1"/><text x="545" y="127" text-anchor="middle" font-weight="700">MGET</text><text x="545" y="144" text-anchor="middle" font-size="10.5" fill="#5b6675">all counts</text>
+      <line x1="455" y1="131" x2="483" y2="131" stroke="#15803d" marker-end="url(#a5)"/>
+      <rect x="635" y="105" width="130" height="52" rx="9" fill="#fff" stroke="#cbd5e1"/><text x="700" y="124" text-anchor="middle" font-weight="700">ParseKey</text><text x="700" y="142" text-anchor="middle" font-size="10.5" fill="#5b6675">→ []store.Usage</text>
+      <line x1="605" y1="131" x2="633" y2="131" stroke="#15803d" marker-end="url(#a5)"/>
+      <rect x="795" y="100" width="165" height="62" rx="9" fill="#eef4ff" stroke="#2563eb"/><text x="877" y="124" text-anchor="middle" font-weight="800" fill="#1d4ed8">batch UPSERT</text><text x="877" y="142" text-anchor="middle" font-size="10.5" fill="#1d4ed8">usage_counters</text>
+      <line x1="765" y1="131" x2="793" y2="131" stroke="#2563eb" marker-end="url(#a5)"/>
+      <text x="490" y="46" font-weight="800" fill="#166534">usage.Flusher.flushOnce — runs only on the lease winner</text>
+      <text x="490" y="64" font-size="11" fill="#64748b">SCAN (not KEYS) → one MGET → one batched, idempotent UPSERT</text>
+    </svg>
+    <figcaption>The flush path. The lease gate is an <i>optimization</i> — the UPSERT is idempotent, so even a double-flush is harmless.</figcaption>
+  </figure>
+
+  <details class="step" open id="g3-keys">
+    <summary><span class="num">1</span> <code class="inl">usage/keys.go</code> — the key format <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer design"><span class="tag">Why a new package</span> The flusher is a distinct concern (a background batch job), so it gets its own package <code class="inl">usage</code>. It owns the Redis key format — but only needs to <b>parse</b> what the limiter <b>wrote</b>. (The limiter builds the key inline in G.2; the format is mirrored in two places — a small drift risk noted for cleanup.)</div>
+      <div class="codewrap"><div class="fname">keyservice/internal/usage/keys.go<span class="badge">Go ✅ written</span></div><pre><span class="k">package</span> usage
+
+<span class="k">import</span> <span class="s">"strings"</span>
+
+<span class="k">const</span> Prefix = <span class="s">"usage:"</span>                                   <span class="mk">1</span>
+
+<span class="c">// ParseKey splits "usage:2026-06:&lt;tenant&gt;" into its period and tenant id.</span>
+<span class="k">func</span> <span class="f">ParseKey</span>(key <span class="t">string</span>) (period, tenantID <span class="t">string</span>, ok <span class="t">bool</span>) {
+	rest, found := <span class="t">strings</span>.<span class="f">CutPrefix</span>(key, Prefix)          <span class="mk">2</span>
+	<span class="k">if</span> !found { <span class="k">return</span> <span class="s">""</span>, <span class="s">""</span>, <span class="k">false</span> }
+	<span class="k">return</span> <span class="t">strings</span>.<span class="f">Cut</span>(rest, <span class="s">":"</span>)                        <span class="mk">3</span>
+}</pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">1</span><div>One exported constant for the namespace — used both as the <code>MATCH</code> in <code>SCAN usage:*</code> and as the prefix to strip here.</div></div>
+        <div class="note"><span class="m">2</span><div><code>strings.CutPrefix("usage:2026-06:abc", "usage:")</code> → <code>("2026-06:abc", true)</code>. Returns <code>found=false</code> if the prefix isn't there → reject non-usage keys.</div></div>
+        <div class="note"><span class="m">3</span><div><code>strings.Cut("2026-06:abc", ":")</code> → <code>("2026-06", "abc", true)</code>. Splits at the <i>first</i> colon; safe because a UUID has none. We return its tuple straight as <code>(period, tenantID, ok)</code>.</div></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" open id="g3-flush">
+    <summary><span class="num">2</span> <code class="inl">usage/flusher.go</code> — the goroutine + lease <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer design"><span class="tag">Why</span> One long-running goroutine per replica, ticking on an interval. It depends on two things across boundaries: <code class="inl">*redis.Client</code> (to read counters) and <code class="inl">*store.Store</code> (to write the mirror). Injecting both via <code class="inl">NewFlusher</code> keeps it testable — dependency injection.</div>
+      <div class="codewrap"><div class="fname">keyservice/internal/usage/flusher.go<span class="badge">Go · struct (✅ written)</span></div><pre><span class="k">const</span> leaseKey = <span class="s">"lock:usage-flush"</span>
+
+<span class="k">type</span> <span class="t">Flusher</span> <span class="k">struct</span> {
+	rdb       *<span class="t">redis</span>.<span class="t">Client</span>     <span class="c">// reads usage counters + the lease</span>
+	store     *<span class="t">store</span>.<span class="t">Store</span>      <span class="c">// writes the durable mirror</span>
+	replicaID <span class="t">string</span>            <span class="c">// stamped into the lease for observability</span>
+	interval  <span class="t">time</span>.<span class="t">Duration</span>
+}
+
+<span class="k">func</span> <span class="f">NewFlusher</span>(rdb *<span class="t">redis</span>.<span class="t">Client</span>, st *<span class="t">store</span>.<span class="t">Store</span>, replicaID <span class="t">string</span>, interval <span class="t">time</span>.<span class="t">Duration</span>) *<span class="t">Flusher</span> {
+	<span class="k">return</span> &<span class="t">Flusher</span>{rdb: rdb, store: st, replicaID: replicaID, interval: interval}
+}</pre></div>
+      <div class="layer logic"><span class="tag">How — the loop</span> A <code class="inl">time.Ticker</code> fires every interval. Each tick: try the lease; if lost, skip; if won, flush once. <code class="inl">select</code> on <code class="inl">ctx.Done()</code> makes it cancellable.</div>
+      <div class="codewrap"><div class="fname">keyservice/internal/usage/flusher.go<span class="badge">Go · methods (⚠️ to write)</span></div><pre><span class="k">func</span> (f *<span class="t">Flusher</span>) <span class="f">Run</span>(ctx <span class="t">context</span>.<span class="t">Context</span>) {
+	ticker := <span class="t">time</span>.<span class="f">NewTicker</span>(f.interval)                  <span class="mk">1</span>
+	<span class="k">defer</span> ticker.<span class="f">Stop</span>()
+	<span class="k">for</span> {
+		<span class="k">select</span> {
+		<span class="k">case</span> &lt;-ctx.<span class="f">Done</span>(): <span class="k">return</span>                       <span class="mk">2</span>
+		<span class="k">case</span> &lt;-ticker.C:
+			<span class="k">if</span> !f.<span class="f">acquireLease</span>(ctx) { <span class="k">continue</span> }         <span class="mk">3</span>
+			n, err := f.<span class="f">flushOnce</span>(ctx)
+			<span class="k">if</span> err != <span class="k">nil</span> { <span class="t">log</span>.<span class="f">Printf</span>(<span class="s">"usage flush failed: %v"</span>, err); <span class="k">continue</span> }
+			<span class="k">if</span> n &gt; <span class="n">0</span> { <span class="t">log</span>.<span class="f">Printf</span>(<span class="s">"usage flush: mirrored %d counter(s) (replica=%s)"</span>, n, f.replicaID) }
+		}
+	}
+}
+
+<span class="k">func</span> (f *<span class="t">Flusher</span>) <span class="f">acquireLease</span>(ctx <span class="t">context</span>.<span class="t">Context</span>) <span class="t">bool</span> {
+	ok, err := f.rdb.<span class="f">SetNX</span>(ctx, leaseKey, f.replicaID, f.interval).<span class="f">Result</span>()  <span class="mk">4</span>
+	<span class="k">if</span> err != <span class="k">nil</span> { <span class="k">return</span> <span class="k">false</span> }                       <span class="mk">5</span>
+	<span class="k">return</span> ok
+}
+
+<span class="k">func</span> (f *<span class="t">Flusher</span>) <span class="f">flushOnce</span>(ctx <span class="t">context</span>.<span class="t">Context</span>) (<span class="t">int</span>, <span class="t">error</span>) {
+	<span class="k">var</span> keys []<span class="t">string</span>
+	iter := f.rdb.<span class="f">Scan</span>(ctx, <span class="n">0</span>, Prefix+<span class="s">"*"</span>, <span class="n">100</span>).<span class="f">Iterator</span>()       <span class="mk">6</span>
+	<span class="k">for</span> iter.<span class="f">Next</span>(ctx) { keys = <span class="f">append</span>(keys, iter.<span class="f">Val</span>()) }
+	<span class="k">if</span> err := iter.<span class="f">Err</span>(); err != <span class="k">nil</span> { <span class="k">return</span> <span class="n">0</span>, err }
+	<span class="k">if</span> <span class="f">len</span>(keys) == <span class="n">0</span> { <span class="k">return</span> <span class="n">0</span>, <span class="k">nil</span> }
+
+	vals, err := f.rdb.<span class="f">MGet</span>(ctx, keys...).<span class="f">Result</span>()              <span class="mk">7</span>
+	<span class="k">if</span> err != <span class="k">nil</span> { <span class="k">return</span> <span class="n">0</span>, err }
+
+	<span class="k">var</span> rows []<span class="t">store</span>.<span class="t">Usage</span>
+	<span class="k">for</span> i, key := <span class="k">range</span> keys {
+		<span class="k">if</span> vals[i] == <span class="k">nil</span> { <span class="k">continue</span> }                    <span class="mk">8</span>
+		period, tenantID, ok := <span class="f">ParseKey</span>(key)
+		<span class="k">if</span> !ok { <span class="k">continue</span> }
+		count, err := <span class="f">toInt64</span>(vals[i])
+		<span class="k">if</span> err != <span class="k">nil</span> { <span class="k">continue</span> }
+		rows = <span class="f">append</span>(rows, <span class="t">store</span>.<span class="t">Usage</span>{TenantID: tenantID, Period: period, Count: count})  <span class="mk">9</span>
+	}
+	<span class="k">if</span> err := f.store.<span class="f">UpsertUsage</span>(ctx, rows); err != <span class="k">nil</span> { <span class="k">return</span> <span class="n">0</span>, err }  <span class="mk">10</span>
+	<span class="k">return</span> <span class="f">len</span>(rows), <span class="k">nil</span>
+}
+
+<span class="k">func</span> <span class="f">toInt64</span>(v <span class="k">any</span>) (<span class="t">int64</span>, <span class="t">error</span>) {
+	s, ok := v.(<span class="t">string</span>)                                   <span class="mk">11</span>
+	<span class="k">if</span> !ok { <span class="k">return</span> <span class="n">0</span>, <span class="t">fmt</span>.<span class="f">Errorf</span>(<span class="s">"usage value not a string: %T"</span>, v) }
+	<span class="k">return</span> <span class="t">strconv</span>.<span class="f">ParseInt</span>(s, <span class="n">10</span>, <span class="n">64</span>)
+}</pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">1</span><div><code>time.NewTicker</code> delivers a tick on channel <code>ticker.C</code> every interval. <code>defer Stop()</code> releases it so it doesn't leak.</div></div>
+        <div class="note"><span class="m">2</span><div><code>&lt;-ctx.Done()</code> — when the context is cancelled (shutdown), this channel unblocks and we return cleanly. The <code>select</code> waits on whichever fires first.</div></div>
+        <div class="note"><span class="m">3</span><div>Lost the lease → <code>continue</code> to the next tick. No flush this round on this replica.</div></div>
+        <div class="note"><span class="m">4</span><div>The lease — see the API card below. Stamps <code>replicaID</code> as the value so you can see who's leading.</div></div>
+        <div class="note"><span class="m">5</span><div>Redis error → return <code>false</code> (don't flush). Safe: the next round's winner catches up, and the UPSERT is idempotent anyway.</div></div>
+        <div class="note"><span class="m">6</span><div><code>SCAN</code>, never <code>KEYS</code> — cursor-based, non-blocking. The <code>Iterator()</code> hides the cursor loop. <code>100</code> is a per-step count <i>hint</i>, not a limit.</div></div>
+        <div class="note"><span class="m">7</span><div>One <code>MGET</code> for all counts — one round-trip instead of N <code>GET</code>s. Result aligns with <code>keys</code> by index.</div></div>
+        <div class="note"><span class="m">8</span><div><code>nil</code> = key expired between SCAN and MGET (TTL). Skip it gracefully — a normal race, not an error.</div></div>
+        <div class="note"><span class="m">9</span><div><b>Boundary:</b> we build <code>[]store.Usage</code> — the type the <code>store</code> package exposes for the write. That slice is the data crossing usage → store.</div></div>
+        <div class="note"><span class="m">10</span><div>One call hands the whole batch to <code>store</code>. The flusher knows nothing about SQL; <code>store</code> knows nothing about Redis. Clean separation.</div></div>
+        <div class="note"><span class="m">11</span><div>go-redis returns <code>MGET</code> values as <code>any</code> holding <code>string</code>. Type-assert, then <code>strconv.ParseInt(s, base=10, bits=64)</code> → <code>int64</code>.</div></div>
+      </div>
+      <div class="api">
+        <div class="h"><b>rdb.SetNX(ctx, key, value, ttl).Result()</b> — go-redis (the leader lease)</div>
+        <div class="rows">
+          <div class="row"><span class="lab">does</span><div><code>SET key value NX EX ttl</code> in one atomic command: set <b>only if the key does not exist</b> (<code>NX</code>), with an auto-expiry (<code>EX</code>). This is a distributed lock / leader election primitive.</div></div>
+          <div class="row"><span class="lab">value</span><div><code>f.replicaID</code> — who holds it (observability).</div></div>
+          <div class="row"><span class="lab">ttl</span><div><code>f.interval</code> — the lock self-expires so a crashed leader can't block flushing forever.</div></div>
+          <div class="row"><span class="lab">returns</span><div><code>(bool, error)</code>: <code>true</code> = you won and may flush; <code>false</code> = someone else holds it. Error → treat as lost.</div></div>
+          <div class="row"><span class="lab">why safe</span><div>It's an <b>optimization</b>, not correctness: the UPSERT is idempotent, so even if two replicas flushed they'd write identical numbers.</div></div>
+        </div>
+      </div>
+      <div class="api">
+        <div class="h"><b>rdb.Scan(ctx, cursor, match, count).Iterator()</b> — go-redis</div>
+        <div class="rows">
+          <div class="row"><span class="lab">does</span><div>Incrementally walks the keyspace matching <code>match</code>, a chunk per round-trip, resuming from a server cursor. Non-blocking — Redis stays responsive between chunks. The opposite of <code>KEYS</code>, which scans everything in one blocking O(N) sweep.</div></div>
+          <div class="row"><span class="lab">cursor</span><div><code>0</code> = start. The <code>Iterator()</code> manages the cursor internally so you just <code>Next()</code> until done.</div></div>
+          <div class="row"><span class="lab">count</span><div>A <i>hint</i> for chunk size (<code>100</code>), not a cap on total results.</div></div>
+          <div class="row"><span class="lab">caveat</span><div>SCAN can return a key twice or miss keys created mid-scan — fine here (we re-flush every interval anyway).</div></div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" id="g3-store">
+    <summary><span class="num">3</span> <code class="inl">store.UpsertUsage</code> — the batched mirror <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer design"><span class="tag">Why</span> <code class="inl">store</code> owns all SQL, so the write lives here, not in the flusher. It takes a slice and writes it as <b>one pipelined batch</b> — and writes the <b>absolute</b> value so re-running is a no-op (the idempotency the whole design leans on).</div>
+      <div class="codewrap"><div class="fname">keyservice/internal/store/store.go<span class="badge">Go (❌ to write)</span></div><pre><span class="k">type</span> <span class="t">Usage</span> <span class="k">struct</span> { TenantID <span class="t">string</span>; Period <span class="t">string</span>; Count <span class="t">int64</span> }   <span class="mk">1</span>
+
+<span class="k">func</span> (s *<span class="t">Store</span>) <span class="f">UpsertUsage</span>(ctx <span class="t">context</span>.<span class="t">Context</span>, rows []<span class="t">Usage</span>) <span class="t">error</span> {
+	<span class="k">if</span> <span class="f">len</span>(rows) == <span class="n">0</span> { <span class="k">return</span> <span class="k">nil</span> }
+	batch := &<span class="t">pgx</span>.<span class="t">Batch</span>{}                                  <span class="mk">2</span>
+	<span class="k">for</span> _, u := <span class="k">range</span> rows {
+		batch.<span class="f">Queue</span>(
+			<span class="s">`INSERT INTO usage_counters (tenant_id, period, count, updated_at)</span>
+<span class="s">			 VALUES ($1, $2, $3, now())</span>
+<span class="s">			 ON CONFLICT (tenant_id, period)</span>
+<span class="s">			 DO UPDATE SET count = EXCLUDED.count, updated_at = now()`</span>,    <span class="mk">3</span>
+			u.TenantID, u.Period, u.Count,
+		)
+	}
+	br := s.pool.<span class="f">SendBatch</span>(ctx, batch)                        <span class="mk">4</span>
+	<span class="k">defer</span> br.<span class="f">Close</span>()
+	<span class="k">for</span> <span class="k">range</span> rows {
+		<span class="k">if</span> _, err := br.<span class="f">Exec</span>(); err != <span class="k">nil</span> { <span class="k">return</span> err }   <span class="mk">5</span>
+	}
+	<span class="k">return</span> <span class="k">nil</span>
+}</pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">1</span><div>The DTO that crosses usage → store. Plain fields, no SQL leaking up, no Redis leaking down.</div></div>
+        <div class="note"><span class="m">2</span><div><code>pgx.Batch</code> collects multiple statements to send together (pipelining) — one network exchange for N rows.</div></div>
+        <div class="note"><span class="m">3</span><div><b>UPSERT.</b> <code>ON CONFLICT (tenant_id, period) DO UPDATE SET count = EXCLUDED.count</code> — <code>EXCLUDED</code> is "the row I tried to insert". Overwrite (not <code>+</code>) = mirror the absolute Redis total = idempotent.</div></div>
+        <div class="note"><span class="m">4</span><div><code>SendBatch</code> ships the whole queue; <code>defer Close()</code> returns the connection to the pool.</div></div>
+        <div class="note"><span class="m">5</span><div>Drain one result per queued statement; surface the first error. (Skipped: a deleted tenant would fail the FK — impossible today, no delete endpoint.)</div></div>
+      </div>
+      <div class="api">
+        <div class="h"><b>pgx.Batch / pool.SendBatch / br.Exec</b> — pgx pipelining</div>
+        <div class="rows">
+          <div class="row"><span class="lab">Batch.Queue</span><div>Appends a parameterized statement to the batch. No I/O yet — just buffering.</div></div>
+          <div class="row"><span class="lab">SendBatch</span><div>Sends every queued statement in <b>one</b> round-trip and returns a <code>BatchResults</code> to read replies from in order.</div></div>
+          <div class="row"><span class="lab">Exec()</span><div>Pulls the next statement's result; returns <code>(CommandTag, error)</code>. Call it once per queued statement.</div></div>
+          <div class="row"><span class="lab">why</span><div>N tenants → 1 network exchange instead of N. With write-coalescing on top, Postgres load drops ~500×.</div></div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" id="g3-main">
+    <summary><span class="num">4</span> <code class="inl">main.go</code> + compose — wire & configure <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">How</span> Parse <code class="inl">FLUSH_INTERVAL</code> (default 30s), construct the flusher with the existing <code class="inl">rdb</code>/<code class="inl">st</code>/<code class="inl">replicaID</code>, and launch it as a goroutine next to the revocation subscriber.</div>
+      <div class="codewrap"><div class="fname">keyservice/main.go<span class="badge">Go (❌ to write)</span></div><pre>flushInterval := <span class="n">30</span> * <span class="t">time</span>.Second
+<span class="k">if</span> v := <span class="t">os</span>.<span class="f">Getenv</span>(<span class="s">"FLUSH_INTERVAL"</span>); v != <span class="s">""</span> {
+	<span class="k">if</span> d, err := <span class="t">time</span>.<span class="f">ParseDuration</span>(v); err == <span class="k">nil</span> { flushInterval = d }   <span class="mk">1</span>
+}
+<span class="c">// ... after st, rdb, srv are built ...</span>
+flusher := <span class="t">usage</span>.<span class="f">NewFlusher</span>(rdb, st, replicaID, flushInterval)
+<span class="k">go</span> flusher.<span class="f">Run</span>(<span class="t">context</span>.<span class="f">Background</span>())                       <span class="mk">2</span></pre></div>
+      <div class="codewrap"><div class="fname">docker-compose.yml<span class="badge">YAML (❌ to write)</span></div><pre><span class="c"># keyservice env, after RATE_BURST</span>
+      FLUSH_INTERVAL: <span class="s">"${FLUSH_INTERVAL:-30s}"</span></pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">1</span><div><code>time.ParseDuration("5s")</code> → a <code>Duration</code>. Lets you override to <code>5s</code> for fast checkpoint tests without a rebuild.</div></div>
+        <div class="note"><span class="m">2</span><div><code>go …</code> launches the loop on its own goroutine so it runs alongside the HTTP server (which blocks on <code>ListenAndServe</code>). Mirrors the existing <code>go cache.SubscribeRevocations(...)</code> pattern.</div></div>
+      </div>
+    </div>
+  </details>
+
+  <!-- cross-file map -->
+  <h3 id="g3-cross">Cross-file map — who depends on whom</h3>
+  <figure>
+    <svg viewBox="0 0 980 250" font-size="12">
+      <defs><marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>
+      <rect class="svgbg" x="0" y="0" width="980" height="250" rx="10" fill="#fff"/>
+      <rect x="30" y="100" width="150" height="56" rx="9" fill="#fff" stroke="#334155"/><text x="105" y="124" text-anchor="middle" font-weight="800">main.go</text><text x="105" y="142" text-anchor="middle" font-size="10.5" fill="#5b6675">wires everything</text>
+      <rect x="240" y="40" width="170" height="56" rx="9" fill="#e6f7ee" stroke="#15803d"/><text x="325" y="64" text-anchor="middle" font-weight="800" fill="#166534">usage.Flusher</text><text x="325" y="82" text-anchor="middle" font-size="10.5" fill="#166534">SCAN·MGET·lease</text>
+      <rect x="240" y="160" width="170" height="56" rx="9" fill="#fff" stroke="#cbd5e1"/><text x="325" y="184" text-anchor="middle" font-weight="700">usage/keys.go</text><text x="325" y="202" text-anchor="middle" font-size="10.5" fill="#5b6675">ParseKey</text>
+      <rect x="500" y="100" width="170" height="56" rx="9" fill="#eef4ff" stroke="#2563eb"/><text x="585" y="124" text-anchor="middle" font-weight="800" fill="#1d4ed8">store.Store</text><text x="585" y="142" text-anchor="middle" font-size="10.5" fill="#1d4ed8">UpsertUsage (SQL)</text>
+      <rect x="760" y="40" width="180" height="56" rx="9" fill="#fff" stroke="#dc2626"/><text x="850" y="64" text-anchor="middle" font-weight="800" fill="#b91c1c">Redis</text><text x="850" y="82" text-anchor="middle" font-size="10.5" fill="#475569">counters + lease</text>
+      <rect x="760" y="160" width="180" height="56" rx="9" fill="#fff" stroke="#2563eb"/><text x="850" y="184" text-anchor="middle" font-weight="800" fill="#1d4ed8">Postgres</text><text x="850" y="202" text-anchor="middle" font-size="10.5" fill="#475569">usage_counters</text>
+      <line x1="180" y1="120" x2="238" y2="80" stroke="#64748b" marker-end="url(#a6)"/><text x="205" y="92" font-size="10" fill="#64748b">NewFlusher</text>
+      <line x1="410" y1="74" x2="498" y2="116" stroke="#64748b" marker-end="url(#a6)"/><text x="455" y="86" font-size="10" fill="#64748b">[]store.Usage</text>
+      <line x1="325" y1="156" x2="325" y2="158" stroke="#64748b" marker-end="url(#a6)"/>
+      <line x1="340" y1="160" x2="340" y2="98" stroke="#64748b" stroke-dasharray="3 3" marker-end="url(#a6)"/><text x="372" y="130" font-size="10" fill="#64748b">parse</text>
+      <line x1="410" y1="60" x2="758" y2="64" stroke="#64748b" marker-end="url(#a6)"/><text x="585" y="52" font-size="10" fill="#64748b">SCAN·MGET·SetNX</text>
+      <line x1="670" y1="135" x2="758" y2="180" stroke="#2563eb" marker-end="url(#a6)"/><text x="715" y="148" font-size="10" fill="#1d4ed8">batch UPSERT</text>
+    </svg>
+    <figcaption><code>usage</code> reads Redis, builds <code>[]store.Usage</code>, hands it to <code>store</code> which writes Postgres. The two ends never know about each other's backing store.</figcaption>
+  </figure>
+
+  <!-- ============================================================ G.3b -->
+  <h2 class="section" id="g3b">G.3b — the usage endpoint <span class="pill plan">to write</span></h2>
+  <div class="layer design">
+    <span class="tag">Design — why this exists &amp; the contract</span>
+    G.1–G.3a made usage <i>flow</i> (meter on the hot path, mirror to Postgres). But there's still no way to <b>ask</b> "how much has tenant X used this month, and how much is left?" over HTTP — you had to <code class="inl">redis-cli GET</code> and <code class="inl">psql</code> by hand. G.3b adds one admin endpoint that answers it. The key design idea is a <b>two-source read</b> that mirrors where the truth lives:
+    <ul>
+      <li><b>Live present → Redis.</b> The current month's count is the <i>live</i> counter in Redis (<code class="inl">usage:&lt;period&gt;:&lt;tenant&gt;</code>) — always up to the second. The Postgres mirror lags by up to one flush interval, so for "right now" we read Redis.</li>
+      <li><b>Durable past → Postgres.</b> Last month's number no longer exists in Redis (the key expired after its grace). Historical periods come from the <code class="inl">usage_counters</code> mirror. (G.3b builds the live/current path; the <code class="inl">?period=2026-05</code> historical variant is a noted extension.)</li>
+      <li><b>Quota → Postgres.</b> The cap lives on <code class="inl">tenants.monthly_quota</code>; we read it fresh so the answer reflects any admin change immediately (the hot path caches it, but a stats endpoint should be exact).</li>
+    </ul>
+    <b>The contract:</b> <code class="inl">GET /v1/tenants/{id}/usage</code> (admin-authed) → <code class="inl">200 {tenant_id, period, used, quota, remaining}</code>, where <code class="inl">quota</code>/<code class="inl">remaining</code> are <code class="inl">null</code> for an unlimited tenant. Bad UUID → 400, unknown tenant → 404.
+  </div>
+  <div class="layer logic">
+    <span class="tag">Logic — the move</span>
+    <ul>
+      <li>Auth (admin token), read <code class="inl">{id}</code> from the path.</li>
+      <li>Fetch <code class="inl">quota</code> from Postgres → map errors (invalid id → 400, missing → 404). This is also our <b>existence check</b>: no tenant row → 404 before we bother Redis.</li>
+      <li>Read the live <code class="inl">used</code> from Redis for the current period; a missing key (tenant made zero calls) just reads as <code class="inl">0</code> — <b>fail-soft</b>, a stats read should never 500 on a Redis miss.</li>
+      <li>Compute <code class="inl">remaining = quota - used</code> (clamped at 0); leave it <code class="inl">null</code> when unlimited.</li>
+    </ul>
+    <b>One cleanup folded in:</b> the usage-key format was being built inline in two places. G.3b centralizes it in the <code class="inl">usage</code> package (<code class="inl">CurrentPeriod</code> + <code class="inl">Key</code>) so the writer (ratelimit) and the readers (flusher, this endpoint) share one definition — no drift.
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 980 230" font-size="12">
+      <defs><marker id="a7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>
+      <rect class="svgbg" x="0" y="0" width="980" height="230" rx="10" fill="#fff"/>
+      <rect x="20" y="92" width="140" height="56" rx="9" fill="#eef2f7" stroke="#cbd5e1"/><text x="90" y="114" text-anchor="middle" font-weight="700">admin</text><text x="90" y="132" text-anchor="middle" font-size="10.5" fill="#5b6675">GET …/usage</text>
+      <rect x="200" y="86" width="200" height="68" rx="9" fill="#fff" stroke="#334155"/><text x="300" y="110" text-anchor="middle" font-weight="800">handleTenantUsage</text><text x="300" y="128" text-anchor="middle" font-size="10.5" fill="#5b6675">auth · read {id}</text>
+      <line x1="160" y1="120" x2="198" y2="120" stroke="#64748b" marker-end="url(#a7)"/>
+      <!-- postgres quota -->
+      <rect x="470" y="30" width="210" height="58" rx="9" fill="#eef4ff" stroke="#2563eb"/><text x="575" y="54" text-anchor="middle" font-weight="800" fill="#1d4ed8">Postgres</text><text x="575" y="72" text-anchor="middle" font-size="10.5" fill="#1d4ed8">SELECT monthly_quota → quota</text>
+      <line x1="400" y1="105" x2="468" y2="66" stroke="#2563eb" marker-end="url(#a7)"/><text x="430" y="78" font-size="10" fill="#1d4ed8">quota (+404 check)</text>
+      <!-- redis used -->
+      <rect x="470" y="148" width="210" height="58" rx="9" fill="#fff" stroke="#dc2626"/><text x="575" y="172" text-anchor="middle" font-weight="800" fill="#b91c1c">Redis</text><text x="575" y="190" text-anchor="middle" font-size="10.5" fill="#475569">GET usage:&lt;period&gt;:&lt;id&gt; → used</text>
+      <line x1="400" y1="135" x2="468" y2="174" stroke="#dc2626" marker-end="url(#a7)"/><text x="430" y="168" font-size="10" fill="#b91c1c">used (miss→0)</text>
+      <!-- merge -->
+      <rect x="760" y="86" width="200" height="68" rx="9" fill="#eaf6ee" stroke="#15803d"/><text x="860" y="108" text-anchor="middle" font-weight="800" fill="#166534">200 JSON</text><text x="860" y="126" text-anchor="middle" font-size="10" fill="#166534">used · quota · remaining</text><text x="860" y="142" text-anchor="middle" font-size="9.5" fill="#166534">remaining = quota − used</text>
+      <line x1="680" y1="60" x2="758" y2="104" stroke="#64748b" marker-end="url(#a7)"/>
+      <line x1="680" y1="176" x2="758" y2="136" stroke="#64748b" marker-end="url(#a7)"/>
+    </svg>
+    <figcaption>Two-source read: <b>quota</b> (and the 404 existence check) from Postgres, <b>used</b> live from Redis, merged into one JSON answer.</figcaption>
+  </figure>
+
+  <details class="step" open id="g3b-keys">
+    <summary><span class="num">1</span> <code class="inl">usage</code> key helpers — one source of truth <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer design"><span class="tag">Why</span> Three places now touch the key <code class="inl">usage:&lt;period&gt;:&lt;tenant&gt;</code>: the <i>writer</i> (ratelimit.Check, in G.2) and two <i>readers</i> (the flusher's <code class="inl">ParseKey</code>, and this endpoint). If the format drifts between writer and reader, the flusher silently stops finding keys. So we centralize building it next to parsing it.</div>
+      <div class="codewrap"><div class="fname">keyservice/internal/usage/keys.go<span class="badge">Go · add (imports gain "time")</span></div><pre><span class="k">import</span> (
+	<span class="s">"strings"</span>
+	<span class="s">"time"</span>
+)
+
+<span class="k">const</span> Prefix = <span class="s">"usage:"</span>
+
+<span class="c">// CurrentPeriod is the month bucket in UTC, e.g. "2026-06".</span>
+<span class="k">func</span> <span class="f">CurrentPeriod</span>(now <span class="t">time</span>.<span class="t">Time</span>) <span class="t">string</span> {            <span class="mk">1</span>
+	<span class="k">return</span> now.<span class="f">UTC</span>().<span class="f">Format</span>(<span class="s">"2006-01"</span>)
+}
+
+<span class="c">// Key builds the Redis counter key: usage:&lt;period&gt;:&lt;tenant_id&gt;.</span>
+<span class="k">func</span> <span class="f">Key</span>(period, tenantID <span class="t">string</span>) <span class="t">string</span> {                <span class="mk">2</span>
+	<span class="k">return</span> Prefix + period + <span class="s">":"</span> + tenantID
+}</pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">1</span><div>Takes <code>now</code> as a parameter (instead of calling <code>time.Now()</code> inside) so it's pure and testable. <code>.UTC()</code> matches the writer in <code>ratelimit.Check</code> — both must agree on the month.</div></div>
+        <div class="note"><span class="m">2</span><div><code>Key</code> + <code>ParseKey</code> now live side by side — build and parse from the same definition. Optional follow-up: refactor <code>ratelimit.Check</code> to call <code>usage.Key</code> too, so even the writer shares it.</div></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" id="g3b-store">
+    <summary><span class="num">2</span> <code class="inl">store.GetTenantQuota</code> — read the cap + existence check <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer design"><span class="tag">Why</span> <code class="inl">store</code> owns SQL, so the quota read lives here. It returns <code class="inl">*int64</code> (not <code class="inl">int64</code>) because the endpoint must distinguish <i>unlimited</i> (<code class="inl">null</code>) from a real cap — the opposite choice from the hot path, which used <code class="inl">COALESCE(...,0)</code>. Same sentinel-error vocabulary as the other store methods, so the handler maps them uniformly.</div>
+      <div class="codewrap"><div class="fname">keyservice/internal/store/store.go<span class="badge">Go · add</span></div><pre><span class="c">// GetTenantQuota returns a tenant's monthly cap (nil = unlimited).</span>
+<span class="k">func</span> (s *<span class="t">Store</span>) <span class="f">GetTenantQuota</span>(ctx <span class="t">context</span>.<span class="t">Context</span>, tenantID <span class="t">string</span>) (*<span class="t">int64</span>, <span class="t">error</span>) {
+	<span class="k">var</span> quota *<span class="t">int64</span>                                          <span class="mk">1</span>
+	err := s.pool.<span class="f">QueryRow</span>(ctx,
+		<span class="s">`SELECT monthly_quota FROM tenants WHERE id = $1`</span>, tenantID,
+	).<span class="f">Scan</span>(&quota)
+	<span class="k">if</span> err != <span class="k">nil</span> {
+		<span class="k">if</span> <span class="t">errors</span>.<span class="f">Is</span>(err, <span class="t">pgx</span>.ErrNoRows) {
+			<span class="k">return</span> <span class="k">nil</span>, ErrTenantNotFound                  <span class="mk">2</span>
+		}
+		<span class="k">var</span> pgErr *<span class="t">pgconn</span>.<span class="t">PgError</span>
+		<span class="k">if</span> <span class="t">errors</span>.<span class="f">As</span>(err, &pgErr) && pgErr.Code == <span class="s">"22P02"</span> {   <span class="mk">3</span>
+			<span class="k">return</span> <span class="k">nil</span>, ErrInvalidTenantID
+		}
+		<span class="k">return</span> <span class="k">nil</span>, err
+	}
+	<span class="k">return</span> quota, <span class="k">nil</span>
+}</pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">1</span><div><code>var quota *int64</code> — scanning a nullable <code>BIGINT</code> into a <code>*int64</code> leaves it <code>nil</code> on NULL, or points it at the value. That nil <i>is</i> "unlimited".</div></div>
+        <div class="note"><span class="m">2</span><div><code>pgx.ErrNoRows</code> → <code>ErrTenantNotFound</code>. This doubles as the existence check: an unknown id 404s here, before we touch Redis.</div></div>
+        <div class="note"><span class="m">3</span><div><code>22P02</code> = Postgres <code>invalid_text_representation</code> — the <code>{id}</code> wasn't a UUID. Map to <code>ErrInvalidTenantID</code> → 400. Same pattern as <code>CreateAPIKey</code>.</div></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="step" id="g3b-api">
+    <summary><span class="num">3</span> <code class="inl">api.handleTenantUsage</code> — merge &amp; respond <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">How</span> Auth → quota (with error mapping) → live <code class="inl">used</code> from Redis → compute <code class="inl">remaining</code> → encode. Register the route alongside the others in <code class="inl">Routes()</code>.</div>
+      <div class="codewrap"><div class="fname">keyservice/internal/api/api.go<span class="badge">Go · add route + handler (imports gain "usage")</span></div><pre><span class="c">// in Routes():</span>
+mux.<span class="f">HandleFunc</span>(<span class="s">"GET /v1/tenants/{id}/usage"</span>, s.handleTenantUsage)   <span class="mk">1</span>
+
+<span class="k">func</span> (s *<span class="t">Server</span>) <span class="f">handleTenantUsage</span>(w <span class="t">http</span>.<span class="t">ResponseWriter</span>, r *<span class="t">http</span>.<span class="t">Request</span>) {
+	<span class="k">if</span> !s.<span class="f">authAdmin</span>(r) {
+		<span class="f">writeJSONError</span>(w, <span class="t">http</span>.StatusUnauthorized, <span class="s">"unauthorized"</span>)
+		<span class="k">return</span>
+	}
+	tenantID := r.<span class="f">PathValue</span>(<span class="s">"id"</span>)
+	ctx := r.<span class="f">Context</span>()
+
+	quota, err := s.store.<span class="f">GetTenantQuota</span>(ctx, tenantID)         <span class="mk">2</span>
+	<span class="k">if</span> err != <span class="k">nil</span> {
+		<span class="k">switch</span> {
+		<span class="k">case</span> <span class="t">errors</span>.<span class="f">Is</span>(err, <span class="t">store</span>.ErrInvalidTenantID):
+			<span class="f">writeJSONError</span>(w, <span class="t">http</span>.StatusBadRequest, <span class="s">"invalid tenant id"</span>)
+		<span class="k">case</span> <span class="t">errors</span>.<span class="f">Is</span>(err, <span class="t">store</span>.ErrTenantNotFound):
+			<span class="f">writeJSONError</span>(w, <span class="t">http</span>.StatusNotFound, <span class="s">"tenant not found"</span>)
+		<span class="k">default</span>:
+			<span class="t">log</span>.<span class="f">Printf</span>(<span class="s">"get tenant quota: %v"</span>, err)
+			<span class="f">writeJSONError</span>(w, <span class="t">http</span>.StatusInternalServerError, <span class="s">"internal error"</span>)
+		}
+		<span class="k">return</span>
+	}
+
+	period := <span class="t">usage</span>.<span class="f">CurrentPeriod</span>(<span class="t">time</span>.<span class="f">Now</span>())
+	used, _ := s.rdb.<span class="f">Get</span>(ctx, <span class="t">usage</span>.<span class="f">Key</span>(period, tenantID)).<span class="f">Int64</span>()   <span class="mk">3</span>
+
+	<span class="k">var</span> remaining *<span class="t">int64</span>
+	<span class="k">if</span> quota != <span class="k">nil</span> {                                          <span class="mk">4</span>
+		rem := *quota - used
+		<span class="k">if</span> rem &lt; <span class="n">0</span> { rem = <span class="n">0</span> }
+		remaining = &rem
+	}
+
+	w.<span class="f">Header</span>().<span class="f">Set</span>(<span class="s">"Content-Type"</span>, <span class="s">"application/json"</span>)
+	w.<span class="f">WriteHeader</span>(<span class="t">http</span>.StatusOK)
+	_ = <span class="t">json</span>.<span class="f">NewEncoder</span>(w).<span class="f">Encode</span>(<span class="k">struct</span> {                  <span class="mk">5</span>
+		TenantID  <span class="t">string</span> <span class="s">`json:"tenant_id"`</span>
+		Period    <span class="t">string</span> <span class="s">`json:"period"`</span>
+		Used      <span class="t">int64</span>  <span class="s">`json:"used"`</span>
+		Quota     *<span class="t">int64</span> <span class="s">`json:"quota"`</span>
+		Remaining *<span class="t">int64</span> <span class="s">`json:"remaining"`</span>
+	}{tenantID, period, used, quota, remaining})
+}</pre></div>
+      <div class="notes">
+        <div class="note"><span class="m">1</span><div>Go 1.22+ pattern routing: <code>{id}</code> in the pattern → <code>r.PathValue("id")</code>. Same style as the existing <code>POST /v1/tenants/{id}/keys</code>.</div></div>
+        <div class="note"><span class="m">2</span><div>Quota first — it's the existence check. A bad/missing tenant short-circuits to 400/404 here, before any Redis work.</div></div>
+        <div class="note"><span class="m">3</span><div><b>Fail-soft read.</b> We ignore the error: a cache miss (tenant made 0 calls this month) returns <code>redis.Nil</code> → <code>used = 0</code>, which is the right answer. (A real Redis outage also yields 0 — acceptable for a read-only stat; the gate already fails open.)</div></div>
+        <div class="note"><span class="m">4</span><div><code>quota == nil</code> (unlimited) → leave <code>remaining</code> nil. Else clamp at 0 so a lowered cap can't show negative "remaining".</div></div>
+        <div class="note"><span class="m">5</span><div><code>*int64</code> fields encode as a JSON number or <code>null</code> — so an unlimited tenant honestly shows <code>"quota": null, "remaining": null</code>. (No <code>omitempty</code> here: we <i>want</i> the explicit <code>null</code>.)</div></div>
+      </div>
+      <div class="api">
+        <div class="h"><b>rdb.Get(ctx, key).Int64()</b> — go-redis (the live read)</div>
+        <div class="rows">
+          <div class="row"><span class="lab">does</span><div>Reads a string value by key and coerces it to <code>int64</code>. One round-trip.</div></div>
+          <div class="row"><span class="lab">returns</span><div><code>(int64, error)</code>. On a <b>missing key</b> the error is the sentinel <code>redis.Nil</code> and the value is <code>0</code> — which is why ignoring the error is safe here.</div></div>
+          <div class="row"><span class="lab">edge</span><div>If the stored value weren't a valid integer you'd get a parse error — can't happen here, the only writer is the Lua <code>INCR</code>.</div></div>
+          <div class="row"><span class="lab">side effect</span><div>Network round-trip to Redis; read-only.</div></div>
+        </div>
+      </div>
+      <div class="callout"><span>🔌</span><div><b>Cross-file wiring:</b> <code class="inl">api.go</code> gains an import of the <code class="inl">usage</code> package (for <code class="inl">CurrentPeriod</code>/<code class="inl">Key</code>) and uses the <code class="inl">*redis.Client</code> already injected into <code class="inl">Server</code>. No new dependency cycle: <code class="inl">api → usage → store</code>, all one-directional.</div></div>
+      <div class="layer logic"><span class="tag">Verify (when written)</span> <code class="inl">curl -s localhost:8080/v1/tenants/$ID/usage -H "X-Admin-Token: just-works-for-now" | jq</code> after some validates → <code class="inl">{used: N, quota: …, remaining: …}</code>. Bad UUID → 400, unknown tenant → 404, unlimited tenant → <code class="inl">quota:null</code>.</div>
+    </div>
+  </details>
+
+  <!-- ============ GOTCHAS ============ -->
+  <h2 class="section" id="gotchas">Gotchas &amp; tradeoffs to remember</h2>
+  <div class="layer gotcha"><span class="tag">SCAN, not KEYS</span> <code class="inl">KEYS *</code> blocks Redis (single-threaded, O(N) over the whole keyspace) — it freezes every other client. <code class="inl">SCAN</code> walks incrementally. <i>KEYS is for a human at a console; SCAN is for code.</i></div>
+  <div class="layer gotcha"><span class="tag">Mirror = absolute, not additive</span> The UPSERT writes <code class="inl">count = EXCLUDED.count</code>. If it were <code class="inl">count + EXCLUDED.count</code>, every flush would re-add the running total and the number would balloon. Overwrite = idempotent = safe to double-flush.</div>
+  <div class="layer gotcha"><span class="tag">The lease is an optimization</span> Not a correctness mechanism. Because the UPSERT is idempotent, a missed or doubled flush is harmless; the lease just avoids wasted duplicate writes. So no Redlock-grade rigor needed.</div>
+  <div class="layer gotcha"><span class="tag">Fail open vs fail closed</span> Auth fails <b>closed</b> (no row → <code class="inl">ErrKeyNotValid</code> → 401). Rate-limit & quota fail <b>open</b> (Redis error → <code class="inl">Allowed</code>). Security is strict; the hot-path accelerators favor availability.</div>
+  <div class="layer gotcha"><span class="tag">Known limits in G.3a</span> The flusher re-mirrors every counter each round even if unchanged (wasteful, harmless — a "skip unchanged" optimization is a fair follow-up). A <code class="inl">usage:</code> key for a deleted tenant would fail the FK on UPSERT — impossible today (no delete-tenant endpoint).</div>
+  <div class="layer gotcha"><span class="tag">Lua globals bite</span> Reading an undefined global in a Redis Lua script raises and aborts. With Go failing open, that surfaced as "every request returns 200" — enforcement silently off. The fix was matching <code class="inl">bucketKey</code> top and bottom.</div>
+
+  <!-- ============ GLOSSARY ============ -->
+  <h2 class="section" id="glossary">Glossary</h2>
+  <dl class="glossary">
+    <dt>Write coalescing</dt><dd>Batching many small writes into few. Here: per-request Redis INCR → one Postgres UPSERT per tenant per interval (~500×).</dd>
+    <dt>Token bucket</dt><dd>Rate-limit algorithm: a bucket refills at <code class="inl">rate</code>/s up to <code class="inl">capacity</code>; each request spends one token; empty → throttle. Allows bursts up to capacity.</dd>
+    <dt>UPSERT (<code class="inl">ON CONFLICT</code>)</dt><dd>Insert-or-update in one atomic statement. <code class="inl">EXCLUDED</code> = the row you tried to insert.</dd>
+    <dt>Idempotent</dt><dd>Running it again changes nothing further. Our mirror-UPSERT is idempotent → safe double-flush.</dd>
+    <dt>Leader lease / election</dt><dd>Coordinating "only one worker does X" via a short-lived lock (<code class="inl">SET NX EX</code>) that auto-expires.</dd>
+    <dt>Fail open / fail closed</dt><dd>On dependency failure, fail open = allow (availability), fail closed = deny (safety).</dd>
+    <dt>Dependency injection</dt><dd>Passing collaborators in (<code class="inl">NewFlusher(rdb, st, …)</code>) instead of constructing them inside — testable, swappable.</dd>
+    <dt>EVALSHA</dt><dd>Run a server-cached Lua script by its SHA hash, so the hot path sends a tiny identifier, not the source.</dd>
+    <dt>TTL grace</dt><dd>Extra lifetime (48h) on the counter past month-end, so the flusher captures the final value before Redis drops the key.</dd>
+    <dt>Volatile vs durable</dt><dd>Volatile = in-RAM, lost on restart (Redis). Durable = on-disk, survives crashes (Postgres).</dd>
+  </dl>
+
+  <hr class="soft">
+  <p style="color:var(--muted);font-size:13px">Build-along companion for Chunk G. <b>G.1/G.2</b> done &amp; verified · <b>G.3a</b> written, builds green · <b>G.3b</b> explained above (code marked <i>to write</i>). Next: write G.3b, then <b>G.4</b> (benchmark the ~500× write-reduction + sync <code class="inl">design.html</code>). <a class="up" href="#top">↑ back to top</a></p>
+</main>
+</div>
+
+<script>
+(function(){
+  // collapsible default: keep open ones from markup; make all summaries toggle smoothly (native <details> already does)
+  // smooth scroll handled by CSS scroll-behavior + anchor links.
+
+  // ---- scrollspy: highlight active TOC link ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map = {};
+  links.forEach(function(a){
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if(el) map[id] = a;
+  });
+  var ids = Object.keys(map);
+
+  function onScroll(){
+    var best=null, bestTop=-Infinity;
+    var probe = 130; // px from top counts as "current"
+    ids.forEach(function(id){
+      var el = document.getElementById(id);
+      var top = el.getBoundingClientRect().top;
+      if(top - probe <= 0 && top > bestTop){ bestTop = top; best = id; }
+    });
+    links.forEach(function(a){ a.classList.remove('active'); });
+    if(best && map[best]) map[best].classList.add('active');
+  }
+  document.addEventListener('scroll', onScroll, {passive:true});
+  window.addEventListener('resize', onScroll);
+
+  // ---- clicking a TOC link to a collapsed step opens it ----
+  links.forEach(function(a){
+    a.addEventListener('click', function(){
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if(el && el.tagName.toLowerCase()==='details') el.open = true;
+      // if target is inside a details, open ancestor details too
+      var p = el;
+      while(p){ if(p.tagName && p.tagName.toLowerCase()==='details') p.open=true; p=p.parentElement; }
+    });
+  });
+
+  onScroll();
+})();
+</script>
+</body>
+</html>

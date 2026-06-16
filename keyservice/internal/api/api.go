@@ -17,6 +17,7 @@ import (
 	"github.com/Sashreek007/mint/keyservice/internal/keys"
 	"github.com/Sashreek007/mint/keyservice/internal/ratelimit"
 	"github.com/Sashreek007/mint/keyservice/internal/store"
+	"github.com/Sashreek007/mint/keyservice/internal/usage"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -56,6 +57,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /v1/validate", s.handleValidate)
 	mux.HandleFunc("POST /v1/keys/{id}/revoke", s.handleRevokeKey)
 	mux.HandleFunc("GET /v1/cache/stats", s.handleCacheStats)
+	mux.HandleFunc("GET /v1/tenants/{id}/usage", s.handleTenantUsage)
 	return mux
 }
 
@@ -307,4 +309,48 @@ func (s *Server) handleCacheStats(w http.ResponseWriter, r *http.Request) {
 		HitRate float64 `json:"hit_rate"`
 		Replica string  `json:"replica"`
 	}{l1, l2, miss, total, hitRate, s.replicaID})
+}
+
+func (s *Server) handleTenantUsage(w http.ResponseWriter, r *http.Request) {
+	if !s.authAdmin(r) {
+		writeJSONError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	tenantID := r.PathValue("id")
+	ctx := r.Context()
+	quota, err := s.store.GetTenantQuota(ctx, tenantID)
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrInvalidTenantID):
+			writeJSONError(w, http.StatusBadRequest, "invalid tenant id")
+		case errors.Is(err, store.ErrTenantNotFound):
+			writeJSONError(w, http.StatusNotFound, "tenant not found")
+		default:
+			log.Printf("get tenant quota: %v", err)
+			writeJSONError(w, http.StatusInternalServerError, "internal error")
+		}
+		return
+	}
+
+	// live current-period count from Redis: miss (or error) -> 0 (fail-soft)
+	period := usage.CurrentPeriod(time.Now())
+	used, _ := s.rdb.Get(ctx, usage.Key(period, tenantID)).Int64()
+
+	var remaining *int64
+	if quota != nil {
+		rem := *quota - used
+		if rem < 0 {
+			rem = 0
+		}
+		remaining = &rem
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(struct {
+		TenantID  string `json:"tenant_id"`
+		Period    string `json:"period"`
+		Used      int64  `json:"used"`
+		Quota     *int64 `json:"quota"`
+		Remaining *int64 `json:"remaining"`
+	}{tenantID, period, used, quota, remaining})
 }
