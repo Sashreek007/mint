@@ -31,6 +31,27 @@ Where a target is not met on this hardware, the real value is reported as-is
 
 ---
 
+## These numbers vs. the live Grafana dashboard (which to trust)
+
+**This file is the authoritative source.** The Chunk H Grafana dashboard will *not*
+match these figures to the decimal — it measures different things, on purpose:
+
+| | This file (`benchmarks/`) | Grafana dashboard |
+|---|---|---|
+| Computed from | committed load scripts (`hey`, Go `loadgen`) | Prometheus metrics scraped from the running service |
+| Latency | **exact** percentile over every sorted request | **estimated** via `histogram_quantile` (bucket interpolation) |
+| Vantage point | **client-side** — full round-trip incl. nginx + network | **server-side** — in-process handler time only |
+| Window | the **whole run** | a **recent rate window** (~20–60 s) — i.e. "right now" |
+| Scope | one endpoint, controlled request mix | **all routes** aggregated, including fast 429s |
+| Purpose | reproducible **proof** of a target | live **operational** view |
+
+So cite **RESULTS.md** for headline numbers (precise, whole-run, reproducible from a
+script); use **Grafana** to watch behaviour live. They agree in magnitude — p99 ≈ 10 ms,
+cache hit ≈ 99.7 %, flush ≈ 10 writes/s — but Grafana is an *instantaneous estimate*
+while these are *exact, full-run* results. When they differ, this file is correct.
+
+---
+
 ## 1 & 2 — Throughput and latency (`hey -n 100000 -c 50`)
 
 | # | Metric | Conditions | Target | Measured |
@@ -75,40 +96,48 @@ of Postgres.
 
 The hot path meters every request with a Redis `INCR`; a background flusher
 mirrors the live counters to Postgres once per `FLUSH_INTERVAL` (one batched
-UPSERT per active tenant). The database never sees a per-request write, so:
+UPSERT per active tenant). The database never sees a per-request write.
+
+**The invariant that matters** — Postgres write *rate* is bounded by configuration,
+not by traffic:
 
 ```
-reduction = requests_served / postgres_writes = (rps × flush_interval) / active_tenants
+postgres_writes_per_sec = active_tenants / flush_interval     (300 / 30 s = ~10/s)
+reduction               = metered_rps / writes_per_sec
 ```
 
-The ratio is **not a constant** — it scales with traffic and flush cadence and
-inversely with tenant count. Two runs of `write_reduction.sh` (load via the Go
-`loadgen`, rate-limit + quota disabled to **isolate the metering pipeline** — rate
-limiting is Target #F, measured separately):
+Three runs of `write_reduction.sh` (Go `loadgen`, c=50). The first is the realistic
+production config (**rate limiting ON**); the others isolate the pipeline:
 
-| Scenario | tenants | flush | requests | PG writes | **reduction** |
-|---|---|---|---|---|---|
-| **Realistic** (the design operating point) | 300 | 30 s | 600,000 | 1,199 | **500×** |
-| Single-tenant (mechanism upper-bound) | 1 | 5 s | 500,000 | 12 | 41,666× |
+| Scenario | rate limit | tenants | flush | offered | metered | PG writes | ≈ w/s | **reduction** |
+|---|---|---|---|---|---|---|---|---|
+| **Realistic + rate-limited** (production) | on, 100/s | 300 | 30 s | 600,000 | 339,079 | 900 | ~10 | **376×** |
+| Realistic, metering isolated | off | 300 | 30 s | 600,000 | 600,000 | 1,199 | ~10 | 500× |
+| Single-tenant (mechanism upper-bound) | off | 1 | 5 s | 500,000 | 500,000 | 12 | ~0.2 | 41,666× |
 
-**Realistic run — the headline.** 300 tenants, Zipf-skewed traffic, 30 s flush:
-600,000 metered requests produced **1,199 Postgres writes** (≈ 300 tenants × ~4
-flushes over the 109 s run) → **500×**, matching the design target. This run:
-5,514 rps, p50 6.9 ms, p99 40 ms (not the latency benchmark — see §2).
+**Both 300-tenant runs held Postgres to ≈10 writes/s** = `tenants / flush_interval`
+(300/30) — the write rate is set by config and is **invariant to offered load and
+to rate limiting**. That is the target's "~5k/s → ~10/s," reproduced both with and
+without the gate.
 
-**Integrity check passes:** the 300 live Redis counters summed to **exactly
-600,000** = the metered request count. Every request counted once — no lost or
-double `INCR` under 50-way concurrency across 300 tenants (the atomic Lua `INCR`
-doing its job).
+- **Rate-limited (production) run.** 600k offered → **339,079 metered** (the gate
+  correctly 429'd 260,921 hot-key requests) → **900 Postgres writes = 376×**. The
+  write count did *not* rise with the gate on; it's lower than the isolated run only
+  because this run finished faster (fewer 30 s flush windows), not because metering
+  changed. Integrity: the 300 live Redis counters summed to **339,079 = the metered
+  count** exactly.
+- **Isolated run** (rate limiting off) measures the pipeline alone: 600k metered →
+  1,199 writes → **500×**; durable Postgres mirror verified at **exactly 600,000**
+  across the 300 tenants (lossless — the writes captured every event).
+- **Single-tenant** is the mechanism upper-bound: one tenant shrinks the
+  `active_tenants` denominator, so the ratio balloons to 41,666×.
 
-**Why the single-tenant run shows 41,666×.** Same mechanism, different operating
-point: with one tenant the `active_tenants` denominator is tiny, so the ratio
-balloons. Both rows fall straight out of `(rps × flush_interval) / tenants`. The
-load-independent result is the real claim: **the hot path issues zero Postgres
-writes; metering writes are bounded by `tenants × flush_frequency`, fully
-decoupled from request volume — so the busier the service gets, the higher the
-ratio.** The ~500× target is simply the value at a mid-size-SaaS operating point
-(≈300 active tenants, 30 s flush), which the realistic run reproduces.
+**Honest scope.** The "before" (1 write/request) is a *definitional* baseline — a
+per-request-write design writes once per request — not a separately benchmarked
+implementation. What's measured is the **after** side (the real Postgres write
+count) and that it loses nothing (durable mirror == metered count). The load- and
+gate-independent result is the **~10 writes/s write rate**; the reduction ratio is
+that rate against whatever metered volume the operating point produces.
 
 ---
 
@@ -163,9 +192,10 @@ point is C=50 (the numbers above).
   contention for cores). On this laptop the honest measured value is 18k.
 - **Throughput is noisy on a laptop** (±~30%); 18,292 rps is a representative
   well-conditioned run.
-- Target **#3** (usage-metering write reduction) — **built in Chunk G**, measured
-  **500×** at the realistic 300-tenant / 30 s-flush operating point (600k requests
-  → 1,199 Postgres writes); 41,666× single-tenant upper-bound. See §3.
+- Target **#3** (usage-metering write reduction) — **built in Chunk G**. Postgres
+  write rate is bounded at **~10 writes/s** (= tenants/flush) regardless of load or
+  rate limiting. Measured **376×** with rate limiting on (production config), **500×**
+  isolated, 41,666× single-tenant. See §3.
 
 ## Reproduce
 
