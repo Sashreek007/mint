@@ -13,7 +13,7 @@
 
 ## What is Mint?
 
-Every backend re-implements the same boring, security-critical plumbing: check the API key, enforce a rate limit, track usage against a quota. **Mint centralizes that into one fast service.** Your backends call `POST /v1/validate` on every request, and Mint answers *allowed / invalid / rate-limited / over-quota* in a single Redis round-trip on a cache hit — Postgres, the source of truth, never sits on the hot path.
+Every backend re-implements the same security-critical plumbing: checking the API key, enforcing a rate limit, and tracking usage against a quota. **Mint centralizes that into one fast service.** Your backends call `POST /v1/validate` on every request, and Mint answers *allowed / invalid / rate-limited / over-quota* in a single Redis round-trip on a cache hit — Postgres, the source of truth, never sits on the hot path.
 
 It's a **stateless Go service behind nginx**, scaled horizontally across replicas, with an asymmetric failure mode by design: **auth fails closed** (any doubt → reject; security first) while **rate-limiting fails open** (Redis down → allow; availability first).
 
@@ -74,7 +74,7 @@ Live under a realistic sine-wave load — the service-health dashboard (RED metr
 
 ## Engineering highlights
 
-The non-obvious engineering behind those numbers — this is what separates it from a CRUD project:
+The design and optimization choices behind the numbers above:
 
 - **Three-tier read-through cache** (in-process **L1** → Redis **L2** → Postgres) with write-through, negative caching, and **pub/sub fleet-wide invalidation** — 99.7% hit rate, Postgres off the hot path.
 - **One atomic Redis Lua script** does rate-limit + monthly-quota check + usage metering in a *single* round-trip — two extra features for zero extra hops.
@@ -93,9 +93,9 @@ Requires Docker. This brings up nginx + 2 keyservice replicas + Postgres + Redis
 docker compose up -d --build
 ```
 
-### Try the demo — watch Mint enforce
+### Try the demo
 
-Provision a tenant + key, then hammer the demo product (a stock-price API gated by Mint) and watch `200`s turn into `429`s as the rate limit bites:
+Provision a tenant and key, then send a burst of requests to the demo product (a stock-price API gated by Mint). Requests return `200` until the per-key rate limit is reached, after which Mint returns `429`:
 
 ```bash
 # provision a tenant + API key (plaintext key is shown once)
@@ -112,7 +112,7 @@ cd demo && go run ./cmd/burst -key "$KEY" -n 2000 -c 50
 #  2000 requests in 1.6s = 1250 req/s
 ```
 
-A tenant created with `"monthly_quota": 50` instead caps `allowed` at ~50 and then returns `429 monthly quota exceeded`. Open **Grafana at http://localhost:3000** (no login) to watch the rps wave, p99, and rejects-by-reason live.
+A tenant created with `"monthly_quota": 50` instead caps `allowed` at ~50, after which Mint returns `429 monthly quota exceeded`. Open **Grafana at http://localhost:3000** (no login) to observe the request rate, p99 latency, and rejects-by-reason in real time.
 
 ### Run the end-to-end tests
 
