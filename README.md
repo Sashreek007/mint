@@ -103,9 +103,20 @@ go -C integration test ./...              # hermetic — testcontainers spins it
 
 ### Reproduce the benchmarks
 
+Four load tools, each isolating one thing (full cold-start procedure in [`RESULTS.md`](benchmarks/RESULTS.md)):
+
 ```bash
-./benchmarks/run.sh              # throughput + latency, before/after the cache
-./benchmarks/write_reduction.sh  # metering write-reduction
+# peak throughput + latency, before/after the cache   (hey, one warm key)
+./benchmarks/run.sh
+
+# realistic throughput + cache hit rate   (Go loadgen — many keys, Zipf, 5% invalid)
+cd benchmarks/loadgen && go run . -keys 1000 -requests 300000 -concurrency 50
+
+# usage-metering write reduction, Target #3   (Go loadgen + psql)
+./benchmarks/write_reduction.sh
+
+# fill the Grafana dashboard with lifelike sine-wave traffic   (the screenshot above)
+cd benchmarks/realistic_load && go run . -duration 2m
 ```
 
 ## Repo layout
