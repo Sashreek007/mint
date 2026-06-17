@@ -10,8 +10,6 @@
 ![p99 10ms](https://img.shields.io/badge/validate%20p99-10ms-2ea44f)
 ![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f)
 
-*Status: portfolio / learning project — feature-complete through the validate · rate-limit · quota · metering pipeline; benchmarked on a laptop, not run in production.*
-
 ![Mint architecture](docs/mint.excalidraw.png)
 
 ## What is Mint?
