@@ -71,6 +71,10 @@ Live under a realistic sine-wave load — the service-health dashboard (RED metr
 
 ![Grafana — service health under load](docs/grafana.png)
 
+Per-tenant quotas (Postgres-backed dashboard) — capped tenants tracked against their monthly quota, with those at or over 80% flagged:
+
+![Grafana — tenants & quotas](docs/grafana-tenants.png)
+
 **→ [Full benchmark methodology & numbers](benchmarks/RESULTS.md)**
 
 ## Engineering highlights
