@@ -33,7 +33,7 @@ Where a target is not met on this hardware, the real value is reported as-is
 
 ## These numbers vs. the live Grafana dashboard (which to trust)
 
-**This file is the authoritative source.** The Chunk H Grafana dashboard will *not*
+**This file is the authoritative source.** The live Grafana dashboard will *not*
 match these figures to the decimal — it measures different things, on purpose:
 
 | | This file (`benchmarks/`) | Grafana dashboard |
@@ -192,7 +192,7 @@ point is C=50 (the numbers above).
   contention for cores). On this laptop the honest measured value is 18k.
 - **Throughput is noisy on a laptop** (±~30%); 18,292 rps is a representative
   well-conditioned run.
-- Target **#3** (usage-metering write reduction) — **built in Chunk G**. Postgres
+- Target **#3** (usage-metering write reduction) — **implemented and measured**. Postgres
   write rate is bounded at **~10 writes/s** (= tenants/flush) regardless of load or
   rate limiting. Measured **376×** with rate limiting on (production config), **500×**
   isolated, 41,666× single-tenant. See §3.

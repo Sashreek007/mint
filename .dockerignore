@@ -1,0 +1,5 @@
+# The demo image is the only build that uses the repo root as its context
+# (it spans two modules). Ship just those two trees, nothing else.
+*
+!keyservice-go/
+!demo/

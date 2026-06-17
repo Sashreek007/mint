@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: keyservice
+    metrics_path: /metrics
+    dns_sd_configs:
+      - names: ["keyservice"]
+        type: A
+        port: 8080

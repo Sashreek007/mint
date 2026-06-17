@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mint — Chunk H (Observability) Plan</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --ink:#1f2733; --muted:#5b6675; --line:#e3e7ec;
+    --design:#2563eb; --design-bg:#eef4ff;
+    --logic:#7c3aed; --logic-bg:#f4eefe;
+    --gotcha:#d92d20; --gotcha-bg:#fdeeec;
+    --ok:#15803d; --ok-bg:#eaf6ee;
+    --amber:#b45309; --amber-bg:#fff7e8;
+    --code-bg:#0e1726; --code-ink:#d7e0ee;
+    --kw:#c792ea; --str:#c3e88d; --num:#f78c6c; --fn:#82aaff; --com:#5c6a82; --type:#ffcb6b;
+    --radius:12px; --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;font-size:15.5px}
+  .layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:0;max-width:1280px;margin:0 auto}
+  nav.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:24px 16px;border-right:1px solid var(--line);background:var(--panel)}
+  nav.toc h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;font-size:13.5px;padding:4px 10px;border-radius:7px;border-left:2px solid transparent}
+  nav.toc a:hover{background:#f0f3f7;color:var(--ink)}
+  nav.toc a.active{background:var(--design-bg);color:var(--design);border-left-color:var(--design);font-weight:600}
+  nav.toc .brand{font-weight:800;font-size:16px;color:var(--ink);margin-bottom:2px}
+  nav.toc .sub{font-size:12px;color:var(--muted);margin-bottom:6px}
+  main{padding:34px 40px 120px;min-width:0}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:-.01em}
+  h1 + .lede{color:var(--muted);font-size:16px;margin:0 0 22px}
+  h2.section{font-size:23px;margin:46px 0 6px;padding-top:10px;letter-spacing:-.01em}
+  h3{font-size:17px;margin:26px 0 8px}
+  p{margin:10px 0}
+  code.inl{font-family:var(--mono);font-size:.86em;background:#eceff3;border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 9px;border-radius:999px;vertical-align:middle}
+  .pill.plan{background:#eef0f3;color:#5b6675}.pill.core{background:#e6f7ee;color:#15803d}.pill.opt{background:#fff7e8;color:#b45309}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 8px}
+  .legend .chip{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 12px}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .layer{border:1px solid var(--line);border-left-width:4px;border-radius:var(--radius);padding:14px 18px;margin:14px 0;background:var(--panel)}
+  .layer .tag{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;display:inline-block;margin-bottom:4px}
+  .layer.design{border-left-color:var(--design);background:linear-gradient(0deg,var(--panel),var(--panel)),var(--design-bg)}
+  .layer.design .tag{color:var(--design)}
+  .layer.logic{border-left-color:var(--logic)}.layer.logic .tag{color:var(--logic)}
+  .layer.gotcha{border-left-color:var(--gotcha);background:var(--gotcha-bg)}.layer.gotcha .tag{color:var(--gotcha)}
+  .layer.ok{border-left-color:var(--ok);background:var(--ok-bg)}.layer.ok .tag{color:var(--ok)}
+  .layer ul{margin:6px 0;padding-left:20px}.layer li{margin:4px 0}
+  .step{border:1px solid var(--line);border-radius:var(--radius);margin:18px 0;background:var(--panel);overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  .step > summary{cursor:pointer;list-style:none;padding:16px 20px;display:flex;align-items:center;gap:12px;font-weight:700;font-size:16px;user-select:none}
+  .step > summary::-webkit-details-marker{display:none}
+  .step > summary .chev{margin-left:auto;transition:transform .2s;color:var(--muted)}
+  .step[open] > summary .chev{transform:rotate(90deg)}
+  .step > summary:hover{background:#fafbfc}
+  .step .body{padding:4px 22px 22px;border-top:1px solid var(--line)}
+  .step .num{width:30px;height:26px;border-radius:7px;background:var(--ink);color:#fff;font-size:12px;display:grid;place-items:center;font-weight:800;flex:none}
+  .codewrap{margin:14px 0;border-radius:10px;overflow:hidden;border:1px solid #1c2638}
+  .codewrap .fname{background:#0a1120;color:#9fb0c9;font-family:var(--mono);font-size:12.5px;padding:8px 14px;border-bottom:1px solid #1c2638;display:flex;gap:8px;align-items:center}
+  .codewrap .fname .badge{margin-left:auto;font-size:10.5px;color:#6b7a95;text-transform:uppercase;letter-spacing:.06em}
+  pre{margin:0;background:var(--code-bg);color:var(--code-ink);padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.65;tab-size:4}
+  pre .c{color:var(--com);font-style:italic} pre .k{color:var(--kw)} pre .s{color:var(--str)} pre .n{color:var(--num)} pre .f{color:var(--fn)} pre .t{color:var(--type)}
+  table.kv{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px}
+  table.kv th,table.kv td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  table.kv th{background:#f3f5f8;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  table.kv code{font-family:var(--mono);font-size:.92em;background:#eef1f5;border-radius:4px;padding:0 4px}
+  figure{margin:18px 0;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:16px}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{color:var(--muted);font-size:13px;margin-top:10px;text-align:center}
+  .callout{display:flex;gap:10px;align-items:flex-start;background:#fff8e6;border:1px solid #f5e3a8;border-radius:10px;padding:12px 14px;margin:14px 0;font-size:14px}
+  .glossary dt{font-weight:700;margin-top:12px}.glossary dd{margin:2px 0 0;color:var(--muted)}
+  hr.soft{border:none;border-top:1px solid var(--line);margin:30px 0}
+  .crumbs{font-size:12.5px;color:var(--muted);margin-bottom:18px}
+  a.up{color:var(--design);text-decoration:none}
+  @media (max-width:880px){.layout{grid-template-columns:1fr}nav.toc{display:none}main{padding:24px 18px 80px}}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="toc" id="toc">
+  <div class="brand">Mint · Chunk H</div>
+  <div class="sub">Observability — the plan</div>
+  <a href="#top">Overview</a>
+  <a href="#pillars">The three pillars</a>
+  <a href="#decision">Stack decision</a>
+  <a href="#flow">How it flows</a>
+  <a href="#topology">Compose topology</a>
+  <a href="#guide" style="font-weight:700;color:var(--ink)">▸ Build guide (steps)</a>
+  <h2>H.1 — instrument (Go)</h2>
+  <a href="#h1">Plan</a>
+  <a href="#metrics">Metrics catalog</a>
+  <a href="#mw">Middleware + RED</a>
+  <a href="#slog">slog logging</a>
+  <a href="#readyz">/readyz vs /healthz</a>
+  <h2>H.2 — Prometheus + Grafana</h2>
+  <a href="#h2">Plan</a>
+  <a href="#scrape">Scrape config</a>
+  <a href="#dashboard">Dashboard mockup</a>
+  <a href="#promql">The PromQL</a>
+  <h2>H.3 — traces (optional)</h2>
+  <a href="#h3">OTel + Tempo</a>
+  <h2>Reference</h2>
+  <a href="#verify">Verification</a>
+  <a href="#gotchas">Gotchas</a>
+  <a href="#glossary">Glossary</a>
+</nav>
+
+<main>
+  <span id="top"></span>
+  <div class="crumbs">mint / docs / chunk-h-plan.html — design doc (nothing built yet; code shown is the target)</div>
+  <h1>Chunk H — Observability, the plan</h1>
+  <p class="lede">Make the service <b>visible</b>: structured logs, a Prometheus <code class="inl">/metrics</code> endpoint, and a Grafana dashboard that turns every number in <code class="inl">RESULTS.md</code> into a live, presentable graph — plus a real readiness probe. This doc is the design pass (build-along phases 1–3); each piece answers <i>why</i> before <i>how</i>.</p>
+
+  <div class="legend">
+    <span class="chip"><span class="dot" style="background:var(--design)"></span>Decision — the <i>why</i></span>
+    <span class="chip"><span class="dot" style="background:var(--logic)"></span>Plan — the <i>how</i></span>
+    <span class="chip"><span class="dot" style="background:#0e1726"></span>Target code</span>
+    <span class="chip"><span class="dot" style="background:var(--gotcha)"></span>Gotcha</span>
+    <span class="chip"><span class="pill core" style="padding:1px 8px">core</span> H.1–H.2</span>
+    <span class="chip"><span class="pill opt" style="padding:1px 8px">optional</span> H.3</span>
+  </div>
+
+  <div class="layer design">
+    <span class="tag">The goal (and why it's its own chunk)</span>
+    Everything Mint does well — 18k rps, p99 10 ms, ~99.7% cache hit rate, ~10 writes/s from the flusher — is currently invisible unless you re-run a benchmark. Chunk H makes it <b>continuously observable</b>: the service emits metrics, Prometheus stores them, and Grafana draws them. The payoff is twofold — it's how you <b>operate</b> a service (spot a latency spike, see a dependency die) and, for a portfolio, it's the <b>demo</b>: a dashboard moving in real time as you hammer it.
+  </div>
+
+  <!-- ============ PILLARS ============ -->
+  <h2 class="section" id="pillars">The three pillars — and what we use for each</h2>
+  <div class="layer logic">
+    <span class="tag">Plan</span>
+    Observability is conventionally split into three signal types. We invest where the payoff is for a single service: <b>metrics</b> (the dashboard + the perf-target story) first, <b>logs</b> second, <b>traces</b> optional.
+  </div>
+  <figure>
+    <svg viewBox="0 0 980 250" font-size="12.5">
+      <rect x="0" y="0" width="980" height="250" rx="10" fill="#fff"/>
+      <!-- metrics -->
+      <rect x="20" y="30" width="300" height="190" rx="11" fill="#eef4ff" stroke="#2563eb"/>
+      <text x="170" y="56" text-anchor="middle" font-weight="800" fill="#1d4ed8">METRICS</text>
+      <text x="170" y="78" text-anchor="middle" font-size="11.5" fill="#475569">numeric time-series</text>
+      <text x="170" y="98" text-anchor="middle" font-size="11" fill="#64748b">rps · p99 · hit-rate · writes/s</text>
+      <rect x="50" y="118" width="110" height="34" rx="7" fill="#fff" stroke="#2563eb"/><text x="105" y="140" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1d4ed8">Prometheus</text>
+      <rect x="180" y="118" width="110" height="34" rx="7" fill="#fff" stroke="#2563eb"/><text x="235" y="140" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1d4ed8">Grafana</text>
+      <text x="170" y="178" text-anchor="middle" font-size="11" fill="#15803d" font-weight="700">★ the dashboard / demo</text>
+      <text x="170" y="200" text-anchor="middle" font-size="10.5" fill="#94a3b8">client_golang exposes /metrics</text>
+      <!-- logs -->
+      <rect x="340" y="30" width="300" height="190" rx="11" fill="#f4eefe" stroke="#7c3aed"/>
+      <text x="490" y="56" text-anchor="middle" font-weight="800" fill="#6b21a8">LOGS</text>
+      <text x="490" y="78" text-anchor="middle" font-size="11.5" fill="#475569">discrete event records</text>
+      <text x="490" y="98" text-anchor="middle" font-size="11" fill="#64748b">"tenant X got 429 at 12:04"</text>
+      <rect x="395" y="118" width="190" height="34" rx="7" fill="#fff" stroke="#7c3aed"/><text x="490" y="140" text-anchor="middle" font-size="11.5" font-weight="700" fill="#6b21a8">slog (JSON, stdlib)</text>
+      <text x="490" y="178" text-anchor="middle" font-size="11" fill="#475569">to stdout → docker logs</text>
+      <text x="490" y="200" text-anchor="middle" font-size="10.5" fill="#94a3b8">(Loki later for logs-in-Grafana)</text>
+      <!-- traces -->
+      <rect x="660" y="30" width="300" height="190" rx="11" fill="#f3f4f6" stroke="#9aa3b2" stroke-dasharray="5 4"/>
+      <text x="810" y="56" text-anchor="middle" font-weight="800" fill="#64748b">TRACES</text>
+      <text x="810" y="78" text-anchor="middle" font-size="11.5" fill="#94a3b8">one request's path across spans</text>
+      <text x="810" y="98" text-anchor="middle" font-size="11" fill="#94a3b8">validate → L1 → L2 → Postgres</text>
+      <rect x="700" y="118" width="100" height="34" rx="7" fill="#fff" stroke="#9aa3b2"/><text x="750" y="140" text-anchor="middle" font-size="11.5" font-weight="700" fill="#64748b">OTel</text>
+      <rect x="820" y="118" width="100" height="34" rx="7" fill="#fff" stroke="#9aa3b2"/><text x="870" y="140" text-anchor="middle" font-size="11.5" font-weight="700" fill="#64748b">Tempo</text>
+      <text x="810" y="186" text-anchor="middle" font-size="11" fill="#b45309" font-weight="700">optional — H.3</text>
+    </svg>
+    <figcaption>Metrics (Prometheus + Grafana) is the centerpiece; logs (slog) are core; traces (OTel + Tempo) are an optional H.3 layer.</figcaption>
+  </figure>
+
+  <!-- ============ DECISION ============ -->
+  <h2 class="section" id="decision">Stack decision — why Prometheus + Grafana + slog</h2>
+  <div class="layer design">
+    <span class="tag">Decision (trade-off walkthrough)</span>
+    The driver is "recognizable + presentable + zero-cost + <code class="inl">docker compose up</code> and it works."
+  </div>
+  <table class="kv">
+    <tr><th>Choice</th><th>Options weighed</th><th>Pick &amp; why</th></tr>
+    <tr><td><b>Collect metrics</b></td><td>Prometheus · OpenTelemetry metrics · hosted (Datadog/New&nbsp;Relic)</td><td><b>Prometheus</b> — industry standard, pull-based, free, recognized everywhere. Hosted needs paid accounts/keys (kills a portfolio repo). OTel-metrics is more wiring for one service.</td></tr>
+    <tr><td><b>Instrument (Go)</b></td><td><code>prometheus/client_golang</code> · OTel SDK</td><td><b>client_golang</b> — simplest, rock-solid, and what most real Go services actually use → reads as authentic.</td></tr>
+    <tr><td><b>Present</b></td><td>Grafana · Prometheus's own UI · custom</td><td><b>Grafana</b> — the de-facto dashboard tool; pre-provisioned so it's live on boot. Prometheus's UI is for ad-hoc queries, not dashboards.</td></tr>
+    <tr><td><b>Logs</b></td><td>slog · zap/zerolog · Loki</td><td><b>slog</b> (Go 1.21+ stdlib) — structured JSON, zero deps. Loki deferred (lowest marginal value; one-step add later).</td></tr>
+    <tr><td><b>Traces</b></td><td>OTel+Tempo · Jaeger · none</td><td><b>Deferred to H.3.</b> Marginal for a single-service hot path; included only for the résumé keywords if we want them.</td></tr>
+  </table>
+  <div class="layer ok">
+    <span class="tag">Locked in</span>
+    <b>slog</b> (logs) · <b>prometheus/client_golang</b> → <code class="inl">/metrics</code> · <b>Prometheus</b> (scrape + store) · <b>Grafana</b> (dashboards) · <b>/readyz</b> (readiness). Traces (OTel→Tempo) are an optional H.3.
+  </div>
+
+  <!-- ============ FLOW ============ -->
+  <h2 class="section" id="flow">How it flows — scrape &amp; query</h2>
+  <div class="layer logic">
+    <span class="tag">Plan</span>
+    The service is <b>dumb</b>: it just publishes current numbers at <code class="inl">/metrics</code>. <b>Prometheus pulls</b> (scrapes) that page every ~15 s and remembers it. <b>Grafana queries</b> Prometheus (PromQL) and draws graphs. Three moving parts, one direction of data.
+  </div>
+  <figure>
+    <svg viewBox="0 0 980 220" font-size="12.5">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>
+      <rect x="0" y="0" width="980" height="220" rx="10" fill="#fff"/>
+      <rect x="20" y="80" width="190" height="70" rx="10" fill="#fff" stroke="#334155"/>
+      <text x="115" y="106" text-anchor="middle" font-weight="800">keyservice</text>
+      <text x="115" y="126" text-anchor="middle" font-size="11" fill="#475569">exposes GET /metrics</text>
+      <text x="115" y="142" text-anchor="middle" font-size="10.5" fill="#94a3b8">(current values only)</text>
+      <rect x="320" y="80" width="200" height="70" rx="10" fill="#eef4ff" stroke="#2563eb"/>
+      <text x="420" y="106" text-anchor="middle" font-weight="800" fill="#1d4ed8">Prometheus</text>
+      <text x="420" y="126" text-anchor="middle" font-size="11" fill="#1d4ed8">time-series DB</text>
+      <text x="420" y="142" text-anchor="middle" font-size="10.5" fill="#64748b">stores the history</text>
+      <rect x="630" y="80" width="190" height="70" rx="10" fill="#e6f7ee" stroke="#15803d"/>
+      <text x="725" y="106" text-anchor="middle" font-weight="800" fill="#166534">Grafana</text>
+      <text x="725" y="126" text-anchor="middle" font-size="11" fill="#166534">draws live graphs</text>
+      <text x="725" y="142" text-anchor="middle" font-size="10.5" fill="#64748b">(stores nothing)</text>
+      <rect x="880" y="88" width="84" height="54" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
+      <text x="922" y="112" text-anchor="middle" font-size="20">👀</text><text x="922" y="132" text-anchor="middle" font-size="10" fill="#64748b">browser</text>
+      <line x1="320" y1="100" x2="212" y2="100" stroke="#64748b" marker-end="url(#ar)"/>
+      <text x="266" y="92" text-anchor="middle" font-size="10.5" fill="#2563eb">scrape /15s</text>
+      <text x="266" y="118" text-anchor="middle" font-size="9.5" fill="#94a3b8">(pull)</text>
+      <line x1="630" y1="115" x2="522" y2="115" stroke="#64748b" marker-end="url(#ar)"/>
+      <text x="576" y="107" text-anchor="middle" font-size="10.5" fill="#15803d">PromQL query</text>
+      <line x1="820" y1="115" x2="878" y2="115" stroke="#64748b" marker-end="url(#ar)"/>
+      <text x="120" y="190" text-anchor="middle" font-size="11" fill="#94a3b8">your code emits</text>
+      <text x="420" y="190" text-anchor="middle" font-size="11" fill="#94a3b8">remembers</text>
+      <text x="725" y="190" text-anchor="middle" font-size="11" fill="#94a3b8">visualizes</text>
+    </svg>
+    <figcaption>Pull model: Prometheus reaches into the service; Grafana reaches into Prometheus. Data flows right-to-left on the wire, left-to-right in meaning.</figcaption>
+  </figure>
+
+  <!-- ============ TOPOLOGY ============ -->
+  <h2 class="section" id="topology">Compose topology — what gets added</h2>
+  <figure>
+    <svg viewBox="0 0 980 300" font-size="12">
+      <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#94a3b8"/></marker>
+      <marker id="arg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#15803d"/></marker></defs>
+      <rect x="0" y="0" width="980" height="300" rx="10" fill="#fff"/>
+      <text x="20" y="26" font-size="11.5" fill="#94a3b8" font-weight="700">existing (request path)</text>
+
+      <!-- existing boxes -->
+      <rect x="20" y="116" width="88" height="48" rx="8" fill="#eef2f7" stroke="#cbd5e1"/><text x="64" y="145" text-anchor="middle" font-weight="700">nginx</text>
+      <rect x="150" y="92" width="122" height="44" rx="8" fill="#eef2f7" stroke="#cbd5e1"/><text x="211" y="119" text-anchor="middle" font-weight="700" font-size="11.5">keyservice-1</text>
+      <rect x="150" y="150" width="122" height="44" rx="8" fill="#eef2f7" stroke="#cbd5e1"/><text x="211" y="177" text-anchor="middle" font-weight="700" font-size="11.5">keyservice-2</text>
+      <rect x="30" y="244" width="110" height="40" rx="8" fill="#eef2f7" stroke="#cbd5e1"/><text x="85" y="269" text-anchor="middle" font-weight="700" font-size="11.5">postgres</text>
+      <rect x="162" y="244" width="110" height="40" rx="8" fill="#eef2f7" stroke="#cbd5e1"/><text x="217" y="269" text-anchor="middle" font-weight="700" font-size="11.5">redis</text>
+
+      <!-- nginx fans to both replicas (round-robin) -->
+      <line x1="108" y1="132" x2="147" y2="116" stroke="#94a3b8" marker-end="url(#ar2)"/>
+      <line x1="108" y1="150" x2="147" y2="170" stroke="#94a3b8" marker-end="url(#ar2)"/>
+      <text x="64" y="184" text-anchor="middle" font-size="9.5" fill="#94a3b8">round-robin</text>
+      <!-- replicas use Postgres + Redis -->
+      <line x1="188" y1="194" x2="100" y2="242" stroke="#94a3b8" marker-end="url(#ar2)"/>
+      <line x1="224" y1="194" x2="219" y2="242" stroke="#94a3b8" marker-end="url(#ar2)"/>
+
+      <!-- new -->
+      <text x="530" y="26" text-anchor="middle" font-size="11.5" fill="#15803d" font-weight="700">added in Chunk H</text>
+      <rect x="450" y="104" width="160" height="64" rx="10" fill="#eef4ff" stroke="#2563eb"/><text x="530" y="130" text-anchor="middle" font-weight="800" fill="#1d4ed8">prometheus</text><text x="530" y="149" text-anchor="middle" font-size="10.5" fill="#64748b">:9090 · scrapes + stores</text>
+      <rect x="700" y="104" width="160" height="64" rx="10" fill="#e6f7ee" stroke="#15803d"/><text x="780" y="130" text-anchor="middle" font-weight="800" fill="#166534">grafana</text><text x="780" y="149" text-anchor="middle" font-size="10.5" fill="#64748b">:3000 · dashboards</text>
+
+      <!-- scrape arrows: prometheus -> BOTH replicas (dns_sd) -->
+      <line x1="450" y1="124" x2="274" y2="114" stroke="#15803d" marker-end="url(#arg)"/>
+      <line x1="450" y1="150" x2="274" y2="172" stroke="#15803d" marker-end="url(#arg)"/>
+      <text x="362" y="100" text-anchor="middle" font-size="10" fill="#15803d">scrape /metrics — BOTH replicas (dns_sd)</text>
+
+      <!-- grafana -> prometheus -->
+      <line x1="700" y1="136" x2="612" y2="136" stroke="#94a3b8" marker-end="url(#ar2)"/><text x="656" y="128" text-anchor="middle" font-size="10" fill="#15803d">PromQL</text>
+
+      <text x="530" y="196" text-anchor="middle" font-size="11" fill="#94a3b8">prometheus.yml (scrape config)</text>
+      <text x="780" y="196" text-anchor="middle" font-size="11" fill="#94a3b8">provisioned datasource + dashboard JSON</text>
+    </svg>
+    <figcaption>Existing request path on the left (nginx → both replicas → Postgres/Redis); the two new containers on the right. Prometheus scrapes <b>each</b> replica directly via DNS service discovery — <b>not</b> through nginx — see the scraping gotcha.</figcaption>
+  </figure>
+
+  <!-- ============ BUILD GUIDE ============ -->
+  <h2 class="section" id="guide">Step-by-step build guide</h2>
+  <div class="layer logic">
+    <span class="tag">How to use this</span>
+    Do these in order, top to bottom. Each step says <b>what to do</b>, the <b>file</b>, and how to <b>verify</b> before moving on. The bulky code/config lives in the reference sections below (linked per step). <b>H.1</b> is pure Go (no infra); <b>H.2</b> adds the two containers; <b>H.3</b> is optional.
+  </div>
+
+  <div class="layer design" style="border-left-color:#2563eb"><span class="tag" style="color:#1d4ed8">H.1 — instrument (Go, no new infra)</span></div>
+
+  <details class="step" open><summary><span class="num">1</span> Add the Prometheus Go client <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">do</span> Pull in <code class="inl">client_golang</code> (gives <code class="inl">prometheus</code>, <code class="inl">promauto</code>, <code class="inl">promhttp</code>).</div>
+      <div class="codewrap"><div class="fname">terminal<span class="badge">bash</span></div><pre>go get github.com/prometheus/client_golang/prometheus
+go mod tidy</pre></div>
+      <div class="layer ok"><span class="tag">verify</span> <code class="inl">go build -C keyservice ./...</code> still passes; the dep is in <code class="inl">go.mod</code>.</div>
+    </div>
+  </details>
+
+  <details class="step"><summary><span class="num">2</span> Create <code class="inl">internal/api/metrics.go</code> <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">do</span> Define the metric vars (counters/histograms/gauge from the <a href="#metrics">catalog</a>), the <code class="inl">statusRecorder</code>, the <code class="inl">metricsMiddleware</code>, and a <code class="inl">routeLabel(r)</code> helper that returns the route <i>template</i> (not the raw path — cardinality). Full source: <a href="#mw">Middleware + RED</a>.</div>
+      <div class="layer ok"><span class="tag">verify</span> <code class="inl">go build</code> passes (metrics registered but not wired yet).</div>
+    </div>
+  </details>
+
+  <details class="step"><summary><span class="num">3</span> Expose <code class="inl">/metrics</code> + wrap the router <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">do</span> In <code class="inl">Routes()</code>: register <code class="inl">mux.Handle("GET /metrics", promhttp.Handler())</code> and return <code class="inl">metricsMiddleware(mux)</code> instead of the bare <code class="inl">mux</code>.</div>
+      <div class="layer ok"><span class="tag">verify</span> <code class="inl">curl localhost:8080/metrics</code> → see <code class="inl">http_requests_total</code> and <code class="inl">http_request_duration_seconds_bucket</code> after a few requests.</div>
+    </div>
+  </details>
+
+  <details class="step"><summary><span class="num">4</span> Emit the Mint-specific metrics at their events <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">do</span> Add <code class="inl">.Inc()</code> / <code class="inl">.Observe()</code> where each event already happens:
+        <ul>
+          <li><code class="inl">handleValidate</code>: on the L1-hit / L2-hit / miss branches → <code class="inl">validate_cache_events_total.WithLabelValues("l1"|"l2"|"miss").Inc()</code></li>
+          <li>verdict switch: <code class="inl">validate_rejected_total.WithLabelValues("rate"|"quota").Inc()</code></li>
+          <li>flusher <code class="inl">flushOnce</code>: add to <code class="inl">usage_flush_writes_total</code>, observe <code class="inl">usage_flush_duration_seconds</code>, set <code class="inl">usage_flush_tenants</code> gauge</li>
+        </ul>
+      </div>
+      <div class="layer ok"><span class="tag">verify</span> Hit <code class="inl">/validate</code> a few times (valid + over-quota); the corresponding counters move on <code class="inl">/metrics</code>.</div>
+    </div>
+  </details>
+
+  <details class="step"><summary><span class="num">5</span> Switch logging to <code class="inl">slog</code> <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">do</span> In <code class="inl">main.go</code>, set a JSON <code class="inl">slog</code> logger as default (see <a href="#slog">slog logging</a>), then replace the <code class="inl">log.Printf(...)</code> calls with <code class="inl">slog.Info/Error(msg, key, val, …)</code>. Keep it to errors + startup + slow/non-2xx — not per request.</div>
+      <div class="layer ok"><span class="tag">verify</span> <code class="inl">docker compose logs keyservice</code> shows one JSON object per line.</div>
+    </div>
+  </details>
+
+  <details class="step"><summary><span class="num">6</span> Add <code class="inl">/readyz</code> (readiness) <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">do</span> Add a <code class="inl">store.Ping(ctx)</code> method (wraps <code class="inl">pool.Ping</code>), then the <code class="inl">handleReadyz</code> that pings Postgres + Redis with an ~800 ms timeout and returns 200/503 (see <a href="#readyz">/readyz</a>). Register <code class="inl">GET /readyz</code>.</div>
+      <div class="layer ok"><span class="tag">verify</span> <code class="inl">/readyz</code> → 200 when up; <code class="inl">docker compose stop redis</code> → <code class="inl">/readyz</code> → 503; restart redis → 200.</div>
+    </div>
+  </details>
+
+  <details class="step"><summary><span class="num">7</span> Rebuild + smoke test H.1 <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">do</span> <code class="inl">docker compose up -d --build --force-recreate keyservice</code>, then re-check <code class="inl">/metrics</code>, <code class="inl">/readyz</code>, and JSON logs on the running stack.</div>
+      <div class="layer ok"><span class="tag">checkpoint</span> H.1 done: the service emits metrics, logs JSON, and reports readiness. No infra yet — but it's now scrape-ready.</div>
+    </div>
+  </details>
+
+  <div class="layer design" style="border-left-color:#2563eb"><span class="tag" style="color:#1d4ed8">H.2 — Prometheus + Grafana (the presentation)</span></div>
+
+  <details class="step"><summary><span class="num">8</span> Write <code class="inl">infra/prometheus.yml</code> <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">do</span> Scrape config using <code class="inl">dns_sd_configs</code> on the <code class="inl">keyservice</code> service name so <b>both replicas</b> are scraped (see <a href="#scrape">Scrape config</a>). Not through nginx.</div>
+      <div class="layer ok"><span class="tag">verify</span> File parses (YAML); ports/paths match.</div>
+    </div>
+  </details>
+
+  <details class="step"><summary><span class="num">9</span> Add Grafana provisioning + dashboard <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">do</span> Three files: <code class="inl">infra/grafana/provisioning/datasources/prometheus.yml</code> (datasource → <code class="inl">http://prometheus:9090</code>), <code class="inl">infra/grafana/provisioning/dashboards/dashboards.yml</code> (a file-provider pointing at the dashboards dir), and <code class="inl">infra/grafana/dashboards/mint.json</code> (the dashboard — panels from the <a href="#promql">PromQL table</a>). <i>I'll hand you <code class="inl">mint.json</code> when we build this step.</i></div>
+      <div class="layer ok"><span class="tag">verify</span> Files in place; JSON is valid.</div>
+    </div>
+  </details>
+
+  <details class="step"><summary><span class="num">10</span> Add the two services to <code class="inl">docker-compose.yml</code> <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">do</span> Add <code class="inl">prometheus</code> (mounts <code class="inl">prometheus.yml</code>, port 9090) and <code class="inl">grafana</code> (mounts provisioning, port 3000, anon admin) — see <a href="#scrape">the compose additions</a>.</div>
+      <div class="layer ok"><span class="tag">verify</span> <code class="inl">docker compose config</code> is valid.</div>
+    </div>
+  </details>
+
+  <details class="step"><summary><span class="num">11</span> Bring it up &amp; watch it live <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">do</span> <code class="inl">docker compose up -d</code>, then drive load with the Go loadgen.</div>
+      <div class="codewrap"><div class="fname">terminal<span class="badge">bash</span></div><pre>docker compose up -d
+open http://localhost:9090/targets     <span class="c"># both keyservice replicas UP</span>
+open http://localhost:3000             <span class="c"># Grafana → Mint dashboard</span>
+cd benchmarks/loadgen &amp;&amp; go run . -keys 1000 -requests 300000 -concurrency 50</pre></div>
+      <div class="layer ok"><span class="tag">checkpoint</span> H.2 done: Prometheus shows both replicas UP; the Grafana dashboard's RED / hit-rate / write-rate / SLO panels move in real time as the loadgen runs. <b>This is the demo.</b></div>
+    </div>
+  </details>
+
+  <div class="layer design" style="border-left-color:#b45309;background:var(--amber-bg)"><span class="tag" style="color:#b45309">H.3 — traces (optional)</span></div>
+
+  <details class="step"><summary><span class="num">12</span> OpenTelemetry → Tempo <span class="chev">▸</span></summary>
+    <div class="body">
+      <div class="layer logic"><span class="tag">do</span> Add the OTel SDK, wrap <code class="inl">/validate</code> in spans (root + L1/L2/Postgres/Lua children), export to a Tempo container, add Tempo as a Grafana datasource (see <a href="#h3">H.3</a>).</div>
+      <div class="layer ok"><span class="tag">verify</span> A <code class="inl">/validate</code> appears as a trace waterfall in Grafana.</div>
+    </div>
+  </details>
+
+  <!-- ============================================================ H.1 -->
+  <h2 class="section" id="h1">H.1 — instrument the Go service <span class="pill core">core · code only</span></h2>
+  <div class="layer logic">
+    <span class="tag">Plan — three additions, no new infra</span>
+    <ul>
+      <li>A <b>metrics middleware</b> wrapping the router that records the <b>RED</b> signals for every request, plus an <code class="inl">/metrics</code> handler.</li>
+      <li>Promote the cache + flusher counters we already track into <b>Prometheus metrics</b>.</li>
+      <li>Switch <code class="inl">log.Printf</code> → <b>slog</b> (JSON), and add <b>/readyz</b>.</li>
+    </ul>
+  </div>
+
+  <h3 id="metrics">Metrics catalog (RED + the Mint-specific ones)</h3>
+  <div class="layer design"><span class="tag">Why these</span> <b>RED</b> = <b>R</b>ate, <b>E</b>rrors, <b>D</b>uration — the canonical "what to measure" for a request-driven service. We add cache hit-rate, the flusher's write-rate (the live 500× story), and the 429 breakdown, so the dashboard mirrors every perf target.</div>
+  <table class="kv">
+    <tr><th>Metric</th><th>Type</th><th>Labels</th><th>Answers</th></tr>
+    <tr><td><code>http_requests_total</code></td><td>Counter</td><td>method, route, status</td><td>Rate + Errors (by route, by status)</td></tr>
+    <tr><td><code>http_request_duration_seconds</code></td><td>Histogram</td><td>method, route</td><td>Duration → p50/p95/p99 via <code>histogram_quantile</code></td></tr>
+    <tr><td><code>validate_cache_events_total</code></td><td>Counter</td><td>tier = l1·l2·miss</td><td>cache hit rate (the 99.7% number)</td></tr>
+    <tr><td><code>validate_rejected_total</code></td><td>Counter</td><td>reason = rate·quota</td><td>429 breakdown (rate-limit vs quota)</td></tr>
+    <tr><td><code>usage_flush_writes_total</code></td><td>Counter</td><td>—</td><td>Postgres writes by the flusher (live write-rate ≈ 10/s)</td></tr>
+    <tr><td><code>usage_flush_duration_seconds</code></td><td>Histogram</td><td>—</td><td>how long a flush takes</td></tr>
+    <tr><td><code>usage_flush_tenants</code></td><td>Gauge</td><td>—</td><td>active tenants mirrored last flush</td></tr>
+    <tr><td colspan="4" style="color:var(--muted)"><b>Free from client_golang:</b> <code>go_goroutines</code>, <code>process_resident_memory_bytes</code>, GC stats, etc. — runtime health, no work.</td></tr>
+  </table>
+  <div class="layer design"><span class="tag">Metric types (define inline)</span>
+    <ul>
+      <li><b>Counter</b> — only ever goes up (e.g. total requests). You graph its <code class="inl">rate()</code>, not the raw value.</li>
+      <li><b>Gauge</b> — goes up and down (e.g. current goroutines, last-flush tenant count).</li>
+      <li><b>Histogram</b> — samples bucketed by range, so Prometheus can compute <b>quantiles</b> (p99) server-side. The right type for latency.</li>
+    </ul>
+  </div>
+
+  <h3 id="mw">The metrics middleware (RED)</h3>
+  <div class="layer design"><span class="tag">Why a middleware</span> RED must be recorded for <i>every</i> route uniformly. A <b>middleware</b> — a wrapper around the handler chain — is the idiomatic Go way: it starts a timer, calls the real handler, then records status + duration once. One place, every route.</div>
+  <div class="codewrap"><div class="fname">keyservice/internal/api/metrics.go<span class="badge">Go · target</span></div><pre><span class="k">var</span> (
+	httpReqs = promauto.<span class="f">NewCounterVec</span>(prometheus.CounterOpts{
+		Name: <span class="s">"http_requests_total"</span>, Help: <span class="s">"Total HTTP requests."</span>,
+	}, []<span class="t">string</span>{<span class="s">"method"</span>, <span class="s">"route"</span>, <span class="s">"status"</span>})
+
+	httpDur = promauto.<span class="f">NewHistogramVec</span>(prometheus.HistogramOpts{
+		Name:    <span class="s">"http_request_duration_seconds"</span>, Help: <span class="s">"Request latency."</span>,
+		Buckets: []<span class="t">float64</span>{.0005, .001, .0025, .005, .01, .025, .05, .1, .25, .5, 1},  <span class="c">// 0.5ms…1s</span>
+	}, []<span class="t">string</span>{<span class="s">"method"</span>, <span class="s">"route"</span>})
+)
+
+<span class="c">// statusRecorder captures the status code the handler writes (ResponseWriter hides it).</span>
+<span class="k">type</span> <span class="t">statusRecorder</span> <span class="k">struct</span> {
+	http.ResponseWriter
+	status <span class="t">int</span>
+}
+<span class="k">func</span> (r *<span class="t">statusRecorder</span>) <span class="f">WriteHeader</span>(c <span class="t">int</span>) { r.status = c; r.ResponseWriter.<span class="f">WriteHeader</span>(c) }
+
+<span class="c">// metricsMiddleware wraps the whole mux: time it, call it, record RED once.</span>
+<span class="k">func</span> <span class="f">metricsMiddleware</span>(next http.Handler) http.Handler {
+	<span class="k">return</span> http.<span class="f">HandlerFunc</span>(<span class="k">func</span>(w http.ResponseWriter, r *http.Request) {
+		start := time.<span class="f">Now</span>()
+		rec := &<span class="t">statusRecorder</span>{ResponseWriter: w, status: <span class="n">200</span>}
+		next.<span class="f">ServeHTTP</span>(rec, r)
+		route := routeLabel(r)                                  <span class="c">// TEMPLATE, not raw path — see gotcha</span>
+		httpReqs.<span class="f">WithLabelValues</span>(r.Method, route, strconv.<span class="f">Itoa</span>(rec.status)).<span class="f">Inc</span>()
+		httpDur.<span class="f">WithLabelValues</span>(r.Method, route).<span class="f">Observe</span>(time.<span class="f">Since</span>(start).<span class="f">Seconds</span>())
+	})
+}</pre></div>
+  <div class="callout"><span>🔌</span><div>Wiring: in <code class="inl">Routes()</code>, return <code class="inl">metricsMiddleware(mux)</code> instead of <code class="inl">mux</code>, and register <code class="inl">mux.Handle("GET /metrics", promhttp.Handler())</code>. The cache/flush metrics get <code class="inl">.Inc()</code> where those events already happen (the L1/L2/miss branches in <code class="inl">handleValidate</code>, the verdict switch, the flusher).</div></div>
+
+  <h3 id="slog">Structured logging (slog)</h3>
+  <div class="layer logic"><span class="tag">Plan</span> Replace <code class="inl">log.Printf</code> with a JSON <code class="inl">slog</code> logger so logs are machine-parseable (and Loki-ready later). Set it once in <code class="inl">main</code>; level via env.</div>
+  <div class="codewrap"><div class="fname">keyservice/main.go<span class="badge">Go · target</span></div><pre><span class="c">// JSON structured logs to stdout; one logger for the whole service.</span>
+logger := slog.<span class="f">New</span>(slog.<span class="f">NewJSONHandler</span>(os.Stdout, &slog.HandlerOptions{
+	Level: slog.LevelInfo,
+}))
+slog.<span class="f">SetDefault</span>(logger)
+slog.<span class="f">Info</span>(<span class="s">"keyservice starting"</span>, <span class="s">"replica"</span>, replicaID, <span class="s">"addr"</span>, addr)</pre></div>
+  <div class="layer gotcha"><span class="tag">Gotcha — don't log every request</span> At 5k rps, an info line per request is a firehose. Log <b>errors</b> and <b>slow/non-2xx</b> requests; let metrics carry the per-request aggregates. Logs are for "what exactly happened to <i>this</i> one," not for counting.</div>
+
+  <h3 id="readyz">/readyz vs /healthz</h3>
+  <div class="layer design"><span class="tag">Why two endpoints</span> <b>Liveness</b> (<code class="inl">/healthz</code>) = "is the process up?" — already exists. <b>Readiness</b> (<code class="inl">/readyz</code>) = "can it actually serve?" — i.e. are Postgres <i>and</i> Redis reachable. A replica that's alive but whose Redis is down should be <b>pulled from rotation</b> (return 503) without being <b>killed</b> (liveness stays ok). That distinction is exactly what load balancers and Kubernetes act on.</div>
+  <div class="codewrap"><div class="fname">keyservice/internal/api/api.go<span class="badge">Go · target</span></div><pre><span class="k">func</span> (s *<span class="t">Server</span>) <span class="f">handleReadyz</span>(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.<span class="f">WithTimeout</span>(r.<span class="f">Context</span>(), <span class="n">800</span>*time.Millisecond)
+	<span class="k">defer</span> <span class="f">cancel</span>()
+	pgOK := s.store.<span class="f">Ping</span>(ctx) == <span class="k">nil</span>           <span class="c">// pool.Ping</span>
+	redisOK := s.rdb.<span class="f">Ping</span>(ctx).<span class="f">Err</span>() == <span class="k">nil</span>
+	code := http.StatusOK
+	<span class="k">if</span> !pgOK || !redisOK { code = http.StatusServiceUnavailable } <span class="c">// 503 → out of rotation</span>
+	w.<span class="f">WriteHeader</span>(code)
+	json.<span class="f">NewEncoder</span>(w).<span class="f">Encode</span>(<span class="k">map</span>[<span class="t">string</span>]<span class="k">bool</span>{<span class="s">"ready"</span>: pgOK &amp;&amp; redisOK, <span class="s">"postgres"</span>: pgOK, <span class="s">"redis"</span>: redisOK})
+}</pre></div>
+
+  <!-- ============================================================ H.2 -->
+  <h2 class="section" id="h2">H.2 — Prometheus + Grafana <span class="pill core">core · the presentation</span></h2>
+  <div class="layer logic"><span class="tag">Plan</span> Add two containers, point Prometheus at both keyservice replicas, and ship a pre-provisioned Grafana dashboard so it's live on <code class="inl">docker compose up</code> — no click-ops.</div>
+
+  <h3 id="scrape">Scrape config — and the replica gotcha</h3>
+  <div class="layer gotcha"><span class="tag">Gotcha — scraping 2 replicas behind one name</span> <code class="inl">keyservice</code> is one Compose service with <code class="inl">replicas: 2</code> → one DNS name shared by two containers. Scraping <code class="inl">keyservice:8080</code> directly would hit a <i>random</i> replica each time and blend their counters. Fix: Docker's embedded DNS returns <b>all</b> replica IPs for the service name, so use Prometheus <b>DNS service discovery</b> (<code class="inl">dns_sd_configs</code>, type A) to scrape <i>every</i> replica as its own target. Scrape directly on the internal network — <b>not</b> through nginx.</div>
+  <div class="codewrap"><div class="fname">infra/prometheus.yml<span class="badge">YAML · target</span></div><pre>global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: keyservice
+    dns_sd_configs:
+      - names: [<span class="s">"keyservice"</span>]      <span class="c"># Docker DNS returns all replica IPs</span>
+        type: A
+        port: 8080
+    metrics_path: /metrics</pre></div>
+  <div class="codewrap"><div class="fname">docker-compose.yml<span class="badge">YAML · target (additions)</span></div><pre>  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes: [<span class="s">"./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro"</span>]
+    ports: [<span class="s">"9090:9090"</span>]
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports: [<span class="s">"3000:3000"</span>]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: <span class="s">"true"</span>          <span class="c"># no login wall for the demo</span>
+      GF_AUTH_ANONYMOUS_ORG_ROLE: <span class="s">"Admin"</span>
+    volumes:
+      - <span class="s">"./infra/grafana/provisioning:/etc/grafana/provisioning:ro"</span>
+      - <span class="s">"./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro"</span></pre></div>
+  <div class="callout"><span>🗂️</span><div>Grafana <b>provisioning</b> = drop a datasource YAML (points at <code class="inl">http://prometheus:9090</code>) and a dashboard JSON into mounted folders; Grafana loads them on startup. That's what makes the dashboard appear automatically — reproducible, version-controlled, no manual setup.</div></div>
+
+  <h3 id="dashboard">The dashboard (mockup)</h3>
+  <div class="layer design"><span class="tag">Why this layout</span> Top row = RED (the health triad). Middle = the Mint story (hit-rate, write-rate). The SLO gauge makes the p99 target a first-class, at-a-glance pass/fail — the senior signal.</div>
+  <figure>
+    <svg viewBox="0 0 980 360" font-size="12">
+      <rect x="0" y="0" width="980" height="360" rx="10" fill="#0e1726"/>
+      <text x="24" y="34" fill="#e6edf3" font-weight="800" font-size="15">Mint · /validate observability</text>
+      <text x="900" y="34" fill="#7d8aa0" font-size="11">last 15m ⟳ 5s</text>
+      <!-- RED row -->
+      <rect x="24" y="50" width="296" height="120" rx="9" fill="#131c2e" stroke="#27324a"/>
+      <text x="40" y="72" fill="#9fb0c9" font-size="11">RATE — requests/sec</text>
+      <polyline points="40,150 80,140 120,120 160,128 200,100 240,108 280,86 300,92" fill="none" stroke="#82aaff" stroke-width="2"/>
+      <text x="40" y="160" fill="#82aaff" font-size="18" font-weight="800">9.8k</text>
+      <rect x="344" y="50" width="296" height="120" rx="9" fill="#131c2e" stroke="#27324a"/>
+      <text x="360" y="72" fill="#9fb0c9" font-size="11">ERRORS — 5xx %</text>
+      <text x="360" y="130" fill="#15c46a" font-size="26" font-weight="800">0.00%</text>
+      <text x="360" y="152" fill="#7d8aa0" font-size="10.5">429s tracked separately ↓</text>
+      <rect x="664" y="50" width="292" height="120" rx="9" fill="#131c2e" stroke="#27324a"/>
+      <text x="680" y="72" fill="#9fb0c9" font-size="11">DURATION — latency</text>
+      <text x="680" y="104" fill="#cfe3ff" font-size="12">p50 <tspan fill="#fff" font-weight="700">6.9ms</tspan>   p95 <tspan fill="#fff" font-weight="700">20ms</tspan></text>
+      <text x="680" y="132" fill="#cfe3ff" font-size="12">p99 <tspan fill="#ffcb6b" font-weight="800" font-size="16">10ms</tspan></text>
+      <!-- middle row -->
+      <rect x="24" y="184" width="230" height="150" rx="9" fill="#131c2e" stroke="#27324a"/>
+      <text x="40" y="206" fill="#9fb0c9" font-size="11">CACHE HIT RATE</text>
+      <circle cx="139" cy="262" r="46" fill="none" stroke="#27324a" stroke-width="12"/>
+      <circle cx="139" cy="262" r="46" fill="none" stroke="#15c46a" stroke-width="12" stroke-dasharray="288 1" stroke-dashoffset="0.8" transform="rotate(-90 139 262)"/>
+      <text x="139" y="268" text-anchor="middle" fill="#fff" font-size="18" font-weight="800">99.7%</text>
+      <rect x="270" y="184" width="290" height="150" rx="9" fill="#131c2e" stroke="#27324a"/>
+      <text x="286" y="206" fill="#9fb0c9" font-size="11">FLUSHER — Postgres writes/sec</text>
+      <polyline points="286,300 330,298 374,302 418,299 462,301 506,300 540,301" fill="none" stroke="#15c46a" stroke-width="2"/>
+      <text x="286" y="250" fill="#15c46a" font-size="20" font-weight="800">~10 /s</text>
+      <text x="286" y="272" fill="#7d8aa0" font-size="10.5">= tenants / flush_interval (invariant)</text>
+      <rect x="576" y="184" width="180" height="150" rx="9" fill="#131c2e" stroke="#27324a"/>
+      <text x="592" y="206" fill="#9fb0c9" font-size="11">SLO — p99 &lt; 20ms</text>
+      <path d="M 592 300 A 74 74 0 0 1 740 300" fill="none" stroke="#27324a" stroke-width="14"/>
+      <path d="M 592 300 A 74 74 0 0 1 700 232" fill="none" stroke="#15c46a" stroke-width="14"/>
+      <text x="666" y="290" text-anchor="middle" fill="#15c46a" font-size="20" font-weight="800">PASS</text>
+      <text x="666" y="312" text-anchor="middle" fill="#7d8aa0" font-size="10.5">10 / 20 ms</text>
+      <rect x="772" y="184" width="184" height="150" rx="9" fill="#131c2e" stroke="#27324a"/>
+      <text x="788" y="206" fill="#9fb0c9" font-size="11">REJECTS /sec</text>
+      <rect x="788" y="240" width="70" height="60" fill="#f78c6c" opacity="0.85"/><text x="823" y="318" text-anchor="middle" fill="#7d8aa0" font-size="10">rate-limit</text>
+      <rect x="876" y="270" width="56" height="30" fill="#ffcb6b" opacity="0.85"/><text x="904" y="318" text-anchor="middle" fill="#7d8aa0" font-size="10">quota</text>
+    </svg>
+    <figcaption>Mockup of the target Grafana dashboard — every panel maps to a metric from H.1 and a number from <code>RESULTS.md</code>. This is the "present it nicely" deliverable.</figcaption>
+  </figure>
+
+  <h3 id="promql">The PromQL behind the panels</h3>
+  <table class="kv">
+    <tr><th>Panel</th><th>PromQL</th></tr>
+    <tr><td>Rate (req/s)</td><td><code>sum(rate(http_requests_total[1m]))</code></td></tr>
+    <tr><td>Errors (5xx %)</td><td><code>sum(rate(http_requests_total{status=~"5.."}[1m])) / sum(rate(http_requests_total[1m]))</code></td></tr>
+    <tr><td>p99 latency</td><td><code>histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))</code></td></tr>
+    <tr><td>Cache hit rate</td><td><code>sum(rate(validate_cache_events_total{tier!="miss"}[5m])) / sum(rate(validate_cache_events_total[5m]))</code></td></tr>
+    <tr><td>Flush writes/s</td><td><code>sum(rate(usage_flush_writes_total[5m]))</code></td></tr>
+    <tr><td>Rejects/s by reason</td><td><code>sum(rate(validate_rejected_total[1m])) by (reason)</code></td></tr>
+  </table>
+
+  <!-- ============================================================ H.3 -->
+  <h2 class="section" id="h3">H.3 — distributed tracing <span class="pill opt">optional</span></h2>
+  <div class="layer logic"><span class="tag">If we do it</span> Add the <b>OpenTelemetry</b> Go SDK, wrap <code class="inl">/validate</code> in a root span and child spans around L1/L2/Postgres + the Lua call, export to <b>Tempo</b>, and add Tempo as a Grafana datasource. Then a single request shows up as a waterfall: where the 4 ms actually went. Buys the OpenTelemetry + distributed-tracing keywords; marginal technical value for one service, so it's last.</div>
+
+  <!-- ============ VERIFY ============ -->
+  <h2 class="section" id="verify">Verification (per sub-chunk)</h2>
+  <table class="kv">
+    <tr><th>After</th><th>Check</th></tr>
+    <tr><td>H.1</td><td><code>curl localhost:8080/metrics</code> shows <code>http_requests_total</code>, histogram buckets, cache/flush metrics; <code>/readyz</code> → 200, and → 503 when Redis is stopped; logs are JSON.</td></tr>
+    <tr><td>H.2</td><td>Prometheus <code>localhost:9090/targets</code> shows <b>both</b> replicas UP; Grafana <code>localhost:3000</code> renders the dashboard; hammer with the Go loadgen → graphs move live.</td></tr>
+    <tr><td>H.3</td><td>A <code>/validate</code> appears in Grafana/Tempo as a trace with L1→L2→Postgres spans.</td></tr>
+  </table>
+
+  <!-- ============ GOTCHAS ============ -->
+  <h2 class="section" id="gotchas">Gotchas to respect</h2>
+  <div class="layer gotcha"><span class="tag">Label cardinality</span> Every unique label-value combo is a separate time-series. <b>Never</b> label by key hash, tenant_id, or raw path — that's unbounded and will blow up Prometheus's memory. Use the <b>route template</b> (<code class="inl">/v1/tenants/{id}/keys</code>) and a bounded status set.</div>
+  <div class="layer gotcha"><span class="tag">Scrape each replica</span> (repeated because it bites) — scrape replicas directly via <code class="inl">dns_sd</code>, not <code class="inl">keyservice:8080</code> round-robined through one name, or you'll blend two replicas' counters.</div>
+  <div class="layer gotcha"><span class="tag">Log volume</span> No info-log per request at 5k rps. Errors + slow/non-2xx only; metrics carry the aggregates.</div>
+  <div class="layer gotcha"><span class="tag">Histogram buckets</span> Quantiles are only as good as the buckets. Latency lives in the 0.5 ms–25 ms range here, so bucket densely there (see the middleware) — default buckets (5 ms–10 s) would make p99 useless.</div>
+  <div class="layer gotcha"><span class="tag">/metrics is internal</span> Don't expose <code class="inl">/metrics</code> through nginx to the public — it leaks operational detail. Scrape it on the internal Docker network only.</div>
+
+  <!-- ============ GLOSSARY ============ -->
+  <h2 class="section" id="glossary">Glossary</h2>
+  <dl class="glossary">
+    <dt>Observability</dt><dd>Being able to ask, from the outside, what a system is doing inside — via metrics, logs, traces.</dd>
+    <dt>Prometheus</dt><dd>Time-series database that periodically <i>scrapes</i> a service's /metrics endpoint and stores the numbers; queried with PromQL.</dd>
+    <dt>Grafana</dt><dd>Dashboard tool that draws graphs by querying a datasource (Prometheus here). Stores nothing itself.</dd>
+    <dt>Scrape (pull model)</dt><dd>Prometheus fetching /metrics on an interval. Opposite of push; lets Prometheus detect a down target.</dd>
+    <dt>Time-series</dt><dd>A stream of (timestamp, value) points for one metric+label-set.</dd>
+    <dt>PromQL</dt><dd>Prometheus's query language — <code class="inl">rate()</code>, <code class="inl">histogram_quantile()</code>, aggregations by label.</dd>
+    <dt>Counter / Gauge / Histogram</dt><dd>Up-only / up-and-down / bucketed-for-quantiles metric types.</dd>
+    <dt>RED method</dt><dd>Rate, Errors, Duration — the standard signals for a request-driven service. (USE = Utilization/Saturation/Errors, for resources.)</dd>
+    <dt>SLI / SLO</dt><dd>SLI = the measured indicator (p99 latency). SLO = the target on it (p99 &lt; 20 ms). The gauge shows current vs target.</dd>
+    <dt>Cardinality</dt><dd>Number of distinct time-series = product of label-value counts. High cardinality (per-id labels) is the classic Prometheus footgun.</dd>
+    <dt>Liveness vs readiness</dt><dd>Liveness = process up (/healthz). Readiness = can serve, deps reachable (/readyz). LBs route on readiness, restart on liveness.</dd>
+    <dt>slog</dt><dd>Go 1.21+ standard-library structured logger (JSON/text handlers, key-value attributes).</dd>
+    <dt>Provisioning (Grafana)</dt><dd>Declaring datasources + dashboards as files Grafana loads on boot — reproducible, no click-ops.</dd>
+    <dt>OpenTelemetry / Tempo</dt><dd>Vendor-neutral instrumentation SDK (OTel) + a traces backend (Tempo). The optional H.3 tracing path.</dd>
+  </dl>
+
+  <hr class="soft">
+  <p style="color:var(--muted);font-size:13px">Chunk H plan — <b>nothing built yet</b>; all code/config above is the target. Build order: <b>H.1</b> (instrument: metrics + slog + /readyz) → <b>H.2</b> (Prometheus + Grafana + dashboard) → <b>H.3</b> (optional traces). <a class="up" href="#top">↑ back to top</a></p>
+</main>
+</div>
+
+<script>
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var map = {};
+  links.forEach(function(a){ var id=a.getAttribute('href').slice(1); var el=document.getElementById(id); if(el) map[id]=a; });
+  var ids = Object.keys(map);
+  function onScroll(){
+    var best=null, bestTop=-Infinity, probe=130;
+    ids.forEach(function(id){
+      var t=document.getElementById(id).getBoundingClientRect().top;
+      if(t-probe<=0 && t>bestTop){ bestTop=t; best=id; }
+    });
+    links.forEach(function(a){ a.classList.remove('active'); });
+    if(best&&map[best]) map[best].classList.add('active');
+  }
+  document.addEventListener('scroll', onScroll, {passive:true});
+  window.addEventListener('resize', onScroll);
+  links.forEach(function(a){ a.addEventListener('click', function(){
+    var el=document.getElementById(a.getAttribute('href').slice(1));
+    var p=el; while(p){ if(p.tagName && p.tagName.toLowerCase()==='details') p.open=true; p=p.parentElement; }
+  });});
+  onScroll();
+})();
+</script>
+</body>
+</html>

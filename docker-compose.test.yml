@@ -1,0 +1,74 @@
+# Minimal Mint stack for the integration tests — testcontainers brings this up
+# (see integration/setup_containers_test.go). No prometheus/grafana/demo: just
+# the pieces the verdict-matrix tests exercise. No host port bindings or named
+# volumes, so it runs fully isolated from a `docker compose up` dev stack and
+# starts from clean state every run.
+services:
+  keyservice:
+    build: ./keyservice
+    deploy:
+      replicas: 2
+    expose:
+      - "8080"
+    environment:
+      DATABASE_URL: "postgres://mint:mint_dev@postgres:5432/mint?sslmode=disable"
+      ADMIN_TOKEN: "just-works-for-now"
+      KEY_PEPPER: "dev-pepper-rotate-in-prod"
+      REDIS_URL: "redis://redis:6379/0"
+      PREWARM_LIMIT: "0" # cold start — honest cache behavior under test
+      RATE_LIMIT: "100"
+      RATE_BURST: "200"
+      FLUSH_INTERVAL: "5s"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  migrate:
+    image: migrate/migrate:v4.17.1
+    volumes:
+      - ./keyservice/migrations:/migrations:ro
+    command:
+      [
+        "-path",
+        "/migrations",
+        "-database",
+        "postgres://mint:mint_dev@postgres:5432/mint?sslmode=disable",
+        "up",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  nginx:
+    build:
+      context: ./infra
+      dockerfile: nginx.Dockerfile
+    ports:
+      - "80" # publish to a RANDOM host port; testcontainers resolves it
+    depends_on:
+      - keyservice
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mint
+      POSTGRES_PASSWORD: mint_dev
+      POSTGRES_DB: mint
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mint -d mint"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 15

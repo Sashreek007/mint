@@ -2,14 +2,14 @@ package main
 
 import (
 	"context"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 
 	"github.com/Sashreek007/mint/keyservice/internal/api"
 	"github.com/Sashreek007/mint/keyservice/internal/cache"
@@ -19,6 +19,11 @@ import (
 )
 
 func main() {
+	// Structured JSON logs. SetDefault also routes the stdlib log package through
+	// slog, so existing log.Printf calls become JSON too.
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
 	// HOSTNAME is set by Docker to the container's short id.
 	replicaID := os.Getenv("HOSTNAME")
 	if replicaID == "" {

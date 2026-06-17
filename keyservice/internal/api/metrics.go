@@ -20,10 +20,10 @@ var (
 	}, []string{"method", "route", "status"})
 
 	httpDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "http_requests_duration_seconds",
+		Name: "http_request_duration_seconds",
 		Help: "HTTP request latency in seconds.",
 		//default buckets are useless for this service, so using more dense buckets
-		Buckets: []float64{.0005, .001, .0025, .005, .01, .025, .05, .1, .25, .5, 1},
+		Buckets: []float64{.0005, .001, .0025, .005, .0075, .01, .015, .02, .03, .05, .075, .1, .25, .5, 1},
 	}, []string{"method", "route"})
 
 	// cache tier hit/miss on /validate — the 99.7% hit-rate story

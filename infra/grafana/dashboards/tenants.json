@@ -1,0 +1,89 @@
+{
+  "uid": "mint-tenants",
+  "title": "Mint · tenants & quotas",
+  "tags": ["mint"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Capped tenants",
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "value" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "postgres", "uid": "postgres" }, "format": "table",
+          "rawSql": "SELECT count(*) AS capped FROM tenants WHERE monthly_quota IS NOT NULL;" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "At / over quota (≥80%)",
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 } ] } },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "colorMode": "background", "textMode": "value" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "postgres", "uid": "postgres" }, "format": "table",
+          "rawSql": "SELECT count(*) AS n FROM tenants t JOIN usage_counters u ON u.tenant_id=t.id AND u.period=to_char(timezone('UTC',now()),'YYYY-MM') WHERE t.monthly_quota IS NOT NULL AND u.count >= 0.8*t.monthly_quota;" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "bargauge",
+      "title": "% of quota consumed (capped tenants)",
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "gridPos": { "h": 11, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent", "min": 0, "max": 100,
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 80 }, { "color": "red", "value": 100 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "showUnfilled": true },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "postgres", "uid": "postgres" }, "format": "table",
+          "rawSql": "SELECT t.name AS metric, round(100.0*COALESCE(u.count,0)/t.monthly_quota,1) AS value FROM tenants t LEFT JOIN usage_counters u ON u.tenant_id=t.id AND u.period=to_char(timezone('UTC',now()),'YYYY-MM') WHERE t.monthly_quota IS NOT NULL ORDER BY value DESC NULLS LAST LIMIT 15;" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Quota usage by tenant — capped only (Postgres mirror, ≤30s lag)",
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "gridPos": { "h": 13, "w": 12, "x": 0, "y": 5 },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "left" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "pct_used" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } },
+              { "id": "min", "value": 0 },
+              { "id": "max", "value": 100 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 80 }, { "color": "red", "value": 100 } ] } }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true, "sortBy": [ { "displayName": "pct_used", "desc": true } ] },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "postgres", "uid": "postgres" }, "format": "table",
+          "rawSql": "SELECT t.name AS tenant, t.monthly_quota AS quota, COALESCE(u.count,0) AS used, round(100.0*COALESCE(u.count,0)/t.monthly_quota,1) AS pct_used FROM tenants t LEFT JOIN usage_counters u ON u.tenant_id=t.id AND u.period=to_char(timezone('UTC',now()),'YYYY-MM') WHERE t.monthly_quota IS NOT NULL ORDER BY pct_used DESC NULLS LAST LIMIT 100;" }
+      ]
+    }
+  ]
+}

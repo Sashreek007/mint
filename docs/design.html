@@ -1159,6 +1159,127 @@
           { t: "Per-key buckets with auto-expiry", d: "Each key isolated; idle buckets TTL away so Redis memory stays bounded even with churny key sets." },
           { t: "Env-configurable (RATE_LIMIT / RATE_BURST)", d: "Tune the limit without rebuilding; verified a 5/5 override yields exactly 5 allowed then 429s." }
         ]
+      },
+      {
+        chunk: "G",
+        title: "Usage metering + quota · Redis INCR + batch flusher",
+        concepts: [
+          { t: "Usage metering", d: "Counting requests actually served, per tenant, for billing/quota. Distinct from rate limit (how FAST) — metering is how MUCH total." },
+          { t: "Monthly quota", d: "Per-tenant cap on total requests in a period (e.g. 1M/month). Over the cap → 429. NULL = unlimited (opt-in, no surprise caps)." },
+          { t: "Quota rides in the cache", d: "monthly_quota is SELECTed in the same JOIN /validate already runs and stored in cache.Result, so the hot-path quota check costs zero extra lookups." },
+          { t: "Combined Lua gate (3 jobs, 1 round-trip)", d: "One Lua script does rate-limit + quota check + usage INCR atomically. Adds ZERO round-trips over Chunk F — the rate-limit call just learned to also meter." },
+          { t: "3-way verdict", d: "The script returns 0/1/2 = RATE_LIMITED / ALLOWED / QUOTA_EXCEEDED. Go translates the Lua int into a Verdict enum (the numbers deliberately don't match — the switch is the bridge)." },
+          { t: "Meter only served (200) requests", d: "Rate-limited (429) and invalid (401) requests never INCR. Usage = billable served calls; rejected ones cost nothing and don't count against quota." },
+          { t: "Atomic INCR", d: "One Redis command increments the shared per-tenant counter — correct under 5k rps across both replicas with no Go locks. The heart of the metering pipeline." },
+          { t: "Write coalescing", d: "Per-request INCR lands in Redis; a background flusher batches the counts to Postgres on an interval. Turns per-request DB writes into a trickle." },
+          { t: "Durable mirror (Fork A)", d: "Redis holds the live monthly total; the flusher UPSERTs that ABSOLUTE value to Postgres. Re-running writes the same number → idempotent, so a double-flush is harmless." },
+          { t: "Write-rate invariant", d: "Postgres writes/sec = active_tenants / flush_interval — independent of request volume AND of rate limiting. 300 tenants / 30s = ~10 writes/s, measured." },
+          { t: "Background flusher", d: "A goroutine: every FLUSH_INTERVAL, SCAN usage:* → MGET all counts → one batched UPSERT to Postgres. Cancellable via ctx." },
+          { t: "SCAN, not KEYS", d: "KEYS blocks single-threaded Redis (O(N) over the whole keyspace). SCAN walks incrementally so Redis stays responsive. KEYS is for a console; SCAN is for code." },
+          { t: "UPSERT (ON CONFLICT DO UPDATE)", d: "Insert-or-update in one statement. EXCLUDED = the row you tried to insert. count = EXCLUDED.count (overwrite, not +=) makes it the idempotent mirror." },
+          { t: "Leader lease", d: "SET NX EX picks one replica to flush per round (NX = only-if-absent; EX = self-expire so a crashed leader can't block). An optimization on top of idempotency, not a correctness requirement." },
+          { t: "pgx.Batch (pipelining)", d: "Queue N statements and send them in ONE network exchange. N tenant UPSERTs become one round-trip." },
+          { t: "TTL + grace", d: "The usage key expires at month-end + 48h grace, so the flusher captures the final value before Redis drops it. Bounds memory without losing the last counts." },
+          { t: "COALESCE(NULL, 0)", d: "Maps a nullable quota to a plain int64 on the hot path (0 = unlimited). The admin /usage read keeps *int64 instead, so it can honestly show null." },
+          { t: "Period bucket (UTC)", d: "Counter key usage:<YYYY-MM>:<tenant>. Computed in UTC so both replicas agree on the month at a boundary." },
+          { t: "Fail-soft (stats read)", d: "GET /usage reads live count from Redis; a miss (or Redis error) → used:0. A stats endpoint should never 500 on a missing counter (vs the gate, which fails open)." },
+          { t: "Live present, durable past", d: "Current-month usage is read live from Redis (up to the second); past months come from the usage_counters mirror in Postgres." }
+        ],
+        optimizations: [
+          { t: "One Lua call: rate-limit + quota + meter", d: "Three jobs bundled into the single Redis round-trip Chunk F already paid for — quota and metering add zero network cost on the hot path." },
+          { t: "Quota carried in the cache entry", d: "monthly_quota rides inside cache.Result, so the per-request quota check needs no extra Postgres/Redis lookup." },
+          { t: "Write coalescing (Redis INCR + batch flusher)", d: "Hot path does ZERO Postgres writes. Measured ~10 writes/s = active_tenants/flush_interval — 376× with rate limiting on (production), 500× isolated, invariant to load." },
+          { t: "Idempotent absolute-value mirror (Fork A)", d: "Flusher UPSERTs the live total (count = EXCLUDED.count); re-running is a no-op, so a double-flush across replicas can't corrupt the count." },
+          { t: "SCAN + MGET + one batched UPSERT", d: "Non-blocking key enumeration, all counts in one MGET, all rows in one pgx.Batch — the whole flush is a handful of round-trips regardless of tenant count." },
+          { t: "Leader lease (SET NX EX)", d: "Only one replica flushes per interval; correctness is already guaranteed by idempotency, so the lease just removes duplicate writes." },
+          { t: "Meter only served requests", d: "Rejected (401/429) requests never INCR — billing counts served calls only, and bad-key/throttle floods cost no metering." },
+          { t: "Self-cleaning counters (TTL + 48h grace)", d: "Usage keys expire after month-end + grace so Redis memory stays bounded while the flusher still captures each period's final value." },
+          { t: "Env-configurable flush (FLUSH_INTERVAL)", d: "Trade durability lag against write rate without a rebuild; the write rate is exactly tenants/FLUSH_INTERVAL." }
+        ]
+      },
+      {
+        chunk: "H",
+        title: "Observability · Prometheus + Grafana + slog",
+        concepts: [
+          { t: "Observability (3 pillars)", d: "Metrics (numeric time-series), logs (discrete events), traces (one request's path). We invest in metrics + logs; traces optional for a single service." },
+          { t: "RED method", d: "Rate, Errors, Duration — the canonical signals for a request-driven service. (USE = Utilization/Saturation/Errors, for resources.)" },
+          { t: "Prometheus", d: "Time-series database that periodically SCRAPES a service's /metrics endpoint and stores the numbers. Pull-based; queried with PromQL." },
+          { t: "Grafana", d: "Dashboard tool that draws graphs by querying a datasource (Prometheus, Postgres). Stores nothing itself." },
+          { t: "Scrape / pull model", d: "Prometheus fetches /metrics on an interval (5s here). Opposite of push; lets it detect a down target." },
+          { t: "Counter / Gauge / Histogram", d: "Up-only (requests_total) / up-and-down (goroutines) / bucketed-for-quantiles (latency). You graph a counter's rate(), not its raw value." },
+          { t: "histogram_quantile", d: "Estimates p50/p95/p99 from histogram buckets by interpolating within a bucket — so quantile precision is bounded by bucket granularity." },
+          { t: "Cardinality", d: "Distinct time-series = product of label-value counts. Never label by tenant_id/key/raw-path — that explodes Prometheus's memory. Keep metrics low-cardinality and aggregate." },
+          { t: "Route-template label", d: "Use the matched pattern (/v1/tenants/{id}/usage via r.Pattern), never the raw path with the id — bounded cardinality." },
+          { t: "Metrics middleware", d: "One http.Handler wrapper that times + counts every request once (RED), using a statusRecorder to capture the status code the stdlib otherwise hides." },
+          { t: "Liveness vs readiness", d: "/healthz = process up (liveness). /readyz = can serve, deps (Postgres+Redis) reachable. LBs route on readiness (503 → out of rotation), restart on liveness." },
+          { t: "slog", d: "Go 1.21+ stdlib structured logger (JSON handler). slog.SetDefault also routes the stdlib log package through it, so existing log.Printf becomes JSON too." },
+          { t: "DNS service discovery (dns_sd)", d: "Prometheus resolves all replica IPs behind the Compose service name and scrapes each as its own target — so the two replicas' counters aren't blended (which static_configs round-robin would do)." },
+          { t: "Provisioning", d: "Declaring datasources + dashboards as files Grafana loads on boot — reproducible, version-controlled, no click-ops." },
+          { t: "$__rate_interval", d: "Grafana variable that auto-sizes the rate() window to the scrape interval (via the datasource timeInterval) — correct and responsive at any scrape cadence." },
+          { t: "SLI / SLO", d: "SLI = the measured indicator (p99 latency). SLO = the target on it (p99 < 20ms). The gauge shows current vs target." },
+          { t: "Server-side vs client-side latency", d: "The dashboard times the in-process handler (server-side, histogram-estimated, recent window). RESULTS.md times the full client round-trip (exact percentile, whole run) — the authoritative source." },
+          { t: "Postgres as a Grafana datasource", d: "Per-tenant/quota data is relational and per-entity — query tenants+usage_counters directly (bounded rows), instead of forcing tenant_id into Prometheus labels (cardinality)." }
+        ],
+        optimizations: [
+          { t: "RED middleware (one wrapper, every route)", d: "http_requests_total{method,route,status} + http_request_duration_seconds histogram recorded once around the whole mux — uniform instrumentation, no per-handler edits." },
+          { t: "Cardinality-safe route labels", d: "routeLabel uses r.Pattern (the matched template), so /v1/tenants/{id}/usage is one series, not one per UUID." },
+          { t: "Free runtime metrics", d: "client_golang ships go_goroutines, process_resident_memory_bytes, GC stats — runtime health for zero extra code." },
+          { t: "Package-local metrics, one registry", d: "Flush metrics live in package usage, cache/reject metrics in api; promauto registers all into the process-wide default registry, exposed by one /metrics handler." },
+          { t: "/readyz pulls a sick replica from rotation", d: "Pings Postgres+Redis with an 800ms timeout; 503 if either is down → the LB stops routing to it without the orchestrator killing a still-alive process." },
+          { t: "slog JSON + stdlib bridge", d: "One slog.SetDefault makes the whole service log structured JSON, including legacy log.Printf calls — no per-file rewrite needed." },
+          { t: "dns_sd scrapes each replica directly", d: "Prometheus discovers both replica IPs behind the service name and scrapes them individually (not through nginx) — per-replica metrics, no blended counters." },
+          { t: "Pre-provisioned Grafana", d: "Datasources + dashboards mount as files → docker compose up brings live dashboards with zero manual setup; version-controlled." },
+          { t: "Two-dashboard split (right tool per job)", d: "Service health on Prometheus (low-cardinality aggregates); per-tenant quotas on Postgres (relational, bounded). Avoids the tenant-label cardinality trap." },
+          { t: "Tuned for honesty + readability", d: "Cumulative cache-hit gauge (stable KPI, not a snap-to-100% live value) and dense latency buckets (5–20ms) so p99 is precise and steady." }
+        ]
+      },
+      {
+        chunk: "I",
+        title: "keyservice-go middleware · the client SDK",
+        concepts: [
+          { t: "Client library / SDK", d: "The consumer's half of an API, packaged: a small library that wraps the remote service's HTTP calls so every consumer doesn't hand-roll them. keyservice-go is to Mint what stripe-go is to Stripe." },
+          { t: "Middleware", d: "An http.Handler wrapper — func(next http.Handler) http.Handler — that runs before/after the real handler. Here it authenticates every request, so handlers stay pure business logic." },
+          { t: "Contract coupling (not code)", d: "The consumer shares NO code with the server — it talks over the HTTP /validate contract. It can't import the server's logic (that needs the pepper, Postgres, Redis) and mustn't have those secrets. The shared thing is the protocol, re-encoded client-side." },
+          { t: "Validate remotely, every request", d: "The middleware calls /validate per request. Caching is tempting but wrong: auth is cacheable, but rate-limit + quota are per-request state — caching would let a key blow past its limits and break the central guarantee." },
+          { t: "Outcome enum", d: "Allowed / Invalid / RateLimited / QuotaExceeded — richer than a bool, so the consumer maps each to the right status (401 vs 429) and can use the client outside HTTP (gRPC, workers)." },
+          { t: "error vs Outcome", d: "The Client returns an error ONLY on transport failure ('couldn't reach Mint'); a revoked key is a successful call with Outcome=Invalid. Separating the two is what lets the middleware fail-closed correctly." },
+          { t: "Fail closed (configurable)", d: "Mint unreachable → 503 by default (it's an auth gate; allowing unverified traffic on an outage is a hole). WithFailOpen() lets a consumer choose availability instead. 503 ≠ 401 — 'couldn't verify' is not 'invalid'." },
+          { t: "Functional options", d: "Option = func(*Client); New(url, WithFailOpen(), WithTimeout(...)). The idiomatic Go way to add optional config without changing the constructor — each WithX returns a closure that mutates the Client." },
+          { t: "Unexported context key", d: "A private `type ctxKey int` used as the context.WithValue key — guarantees no collision with other packages' context keys; values are only readable via the package's TenantID/KeyID helpers." },
+          { t: "Context-bound outbound request", d: "http.NewRequestWithContext(ctx, …) binds the call to the caller's context, so a client disconnect / timeout cancels the outbound /validate too — no leaked goroutine." },
+          { t: "Separate stdlib-only module", d: "Its own go.mod, zero third-party deps — consumers go get it without dragging in the server's pgx/redis. A lightweight client is the whole point." }
+        ],
+        optimizations: [
+          { t: "One-line integration", d: "client.Middleware(mux) turns ~40 lines of per-endpoint auth/rate/quota plumbing into a single wrap; new routes are protected automatically." },
+          { t: "error ≠ Outcome separation", d: "Transport failure → error → fail-closed 503; Mint's verdict → Outcome → 200/401/429. The clean split is what makes the gate correct." },
+          { t: "Stdlib-only separate module", d: "Zero deps + own go.mod → trivial go get for any Go consumer, no server-dependency bloat." },
+          { t: "Language-agnostic by contract", d: "Because the coupling is the HTTP /validate contract, the Go client is just one of many — a Python/Rust consumer follows the same pattern with its own thin client." },
+          { t: "Fail-closed default + opt-in fail-open", d: "Secure by default (503 on Mint outage); WithFailOpen() is an explicit availability tradeoff the consumer owns." },
+          { t: "Collision-safe context injection", d: "Private ctxKey type means the injected tenant/key can't clash with other middleware sharing the request context." }
+        ]
+      },
+      {
+        chunk: "J",
+        title: "demo product · integration tests",
+        concepts: [
+          { t: "Integration / end-to-end test", d: "Exercises the whole chain wired together — demo product → SDK middleware → Mint → Postgres/Redis — asserting real HTTP outcomes, not mocked units. Proves the parts work connected, which unit tests can't." },
+          { t: "Verdict matrix", d: "The table of cases the gate must enforce: valid→200, missing/garbage/revoked→401, over-rate/over-quota→429, Mint-down→503. One test per row = full coverage of the contract." },
+          { t: "testcontainers", d: "A library that starts real Docker containers from Go test code and tears them down after. Here it boots the whole Mint stack so go test is hermetic — no 'start the stack first' ritual." },
+          { t: "Build tags (//go:build)", d: "A top-of-file comment that includes or excludes a file from a build. Files marked //go:build live compile only under -tags live — that's how one suite runs two ways (containers vs the live stack) with no duplicated test logic." },
+          { t: "expose vs ports", d: "In Docker, expose only opens a port INSIDE the compose network; ports publishes it to the host. A process outside Docker (the test runner) can reach only a published port — the exact bug that made the wait strategy fail at first." },
+          { t: "replace directive", d: "go.mod 'replace path => ../dir' redirects an import to a local folder instead of a module proxy. Lets the demo and tests consume the unpublished SDK straight off disk." },
+          { t: "In-process product (httptest)", d: "The demo handler runs inside the test via httptest.NewServer but calls a REAL Mint. Tests the genuine consumer path without containerizing the demo — fast and faithful." },
+          { t: "Eventual-consistency poll", d: "Revocation propagates via pub/sub (async per-replica L1 eviction), so the revoked-key test polls until it sees 401 instead of asserting once — the correct way to test an eventually-consistent invalidation." },
+          { t: "Worker-pool load driver", d: "cmd/burst: a fixed set of goroutines drains a jobs channel, tallying outcomes with atomics. Bursts the API hard enough to make rate-limit and quota enforcement visible live." },
+          { t: "Separate test module", d: "integration/ has its own go.mod so testcontainers' large dependency tree never touches the stdlib-only SDK or the lean demo — heavy deps quarantined where only the tests need them." }
+        ],
+        optimizations: [
+          { t: "One suite, two run modes", d: "Default = testcontainers (hermetic, CI-ready); -tags live = the already-running stack (fast local iteration). Same matrix file, build-tagged setup — zero duplicated test logic." },
+          { t: "Reuse the real deployment artifact", d: "testcontainers brings up a slim docker-compose.test.yml — the real keyservice + nginx images, minus observability — so tests run against the actual build, not a bespoke rig." },
+          { t: "In-process product + real Mint", d: "Run the demo handler via httptest against a real Mint; no demo container to build → faster, still the true consumer path." },
+          { t: "Dependency quarantine", d: "testcontainers lives only in integration/go.mod; the SDK stays zero-dep and the demo stays lean." },
+          { t: "Deterministic, mode-agnostic assertions", d: "A fresh tenant per test isolates counters → an exact quota cap; an unlimited-quota tenant for the rate test → only rate limiting bites. The assertions hold in both modes without tuning." }
+        ]
       }
     ];
 
@@ -1220,10 +1341,10 @@
       { n: 'D', title: '/validate slow path', desc: 'Postgres-only validation (Bearer auth, single-JOIN key+tenant check). Baseline: 12k rps @ p99 17ms (c=50).', status: 'done' },
       { n: 'E', title: 'Cache layer (L1 + L2 + invalidation)', desc: 'In-process L1 + shared Redis L2 + pub/sub invalidation. Measured +52% rps, −41% p99, 99.99% hit rate.', status: 'done' },
       { n: 'F', title: 'Rate limiting', desc: 'Token bucket via atomic Redis Lua script; per-key, fails open, env-configurable. 429 on overflow.', status: 'done' },
-      { n: 'G', title: 'Usage metering + quota', desc: 'Redis INCR counter + background flusher to Postgres; monthly quota check.', status: 'next' },
-      { n: 'H', title: 'Observability', desc: 'slog, /metrics (Prometheus), /healthz vs /readyz.', status: 'todo' },
-      { n: 'I', title: 'keyservice-go middleware', desc: 'Drop-in package for other Go backends.', status: 'todo' },
-      { n: 'J', title: 'Demo product + integration tests', desc: 'End-to-end walkthrough, testcontainers-go.', status: 'todo' }
+      { n: 'G', title: 'Usage metering + quota', desc: 'Combined Lua gate (rate+quota+meter), Redis INCR + leader-lease batch flusher to Postgres, GET /v1/tenants/{id}/usage. Measured ~10 writes/s = tenants/flush (376× rate-limited, 500× isolated).', status: 'done' },
+      { n: 'H', title: 'Observability', desc: 'slog JSON logs, Prometheus /metrics (RED + cache/flush), /readyz; both replicas scraped via dns_sd → two Grafana dashboards (service health + per-tenant quotas, Postgres-backed).', status: 'done' },
+      { n: 'I', title: 'keyservice-go middleware', desc: 'Drop-in, stdlib-only client SDK + one-line auth/rate/quota middleware; Outcome enum, fail-closed default, context-injected tenant id. Verified end-to-end.', status: 'done' },
+      { n: 'J', title: 'Demo product + integration tests', desc: 'Stock-price demo gated by the one-line SDK; cmd/burst shows live rate-limit/quota; verdict-matrix e2e tests run two ways (testcontainers + -tags live). All 7 green.', status: 'done' }
     ];
 
     const chunksEl = document.getElementById('chunks');
