@@ -72,6 +72,19 @@ Live under a realistic sine-wave load — the service-health dashboard (RED metr
 
 **→ [Full benchmark methodology & numbers](benchmarks/RESULTS.md)**
 
+## Engineering highlights
+
+The non-obvious engineering behind those numbers — this is what separates it from a CRUD project:
+
+- **Three-tier read-through cache** (in-process **L1** → Redis **L2** → Postgres) with write-through, negative caching, and **pub/sub fleet-wide invalidation** — 99.7% hit rate, Postgres off the hot path.
+- **One atomic Redis Lua script** does rate-limit + monthly-quota check + usage metering in a *single* round-trip — two extra features for zero extra hops.
+- **Write coalescing** — Redis `INCR` on the hot path + a leader-lease batch flusher with an idempotent absolute-value mirror → **~10 Postgres writes/s regardless of load** (376–500× fewer).
+- **HMAC-SHA256 + server-side pepper** instead of a slow password KDF — microsecond hashing on the 5k-rps hot path, and deterministic so the digest doubles as the unique lookup index (`crypto/rand` + rejection sampling for the keys; hash-only, show-once storage).
+- **Asymmetric failure mode by design** — auth fails **closed** (security), rate-limiting fails **open** (availability).
+- **A one-line client middleware** — the stdlib-only [`keyservice-go`](keyservice-go/) SDK we wrote; `client.Middleware(mux)` gives any backend auth + rate-limit + quota with **zero per-handler code**, mapping Mint's verdict to `200/401/429` and failing closed (`503`) on an outage.
+- **Cardinality-safe observability** — RED metrics labelled by route *template* (not raw path, so no per-UUID series explosion), `/readyz` ≠ `/healthz`, each replica scraped directly.
+- **~22 MB multi-stage image** — static, stripped, non-root binary on bare Alpine.
+
 ## Quick start
 
 Requires Docker. This brings up nginx + 2 keyservice replicas + Postgres + Redis + Prometheus + Grafana + the demo product:
