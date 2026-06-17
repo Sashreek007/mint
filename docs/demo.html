@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mint · Demo Product</title>
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --bg-elev: #131825;
+      --bg-deep: #060a14;
+      --border: #1f2937;
+      --text: #e6edf3;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-warm: #f78166;
+      --good: #7ee787;
+      --warn: #f1c40f;
+      --bad: #f85149;
+      --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; font-size: 16px; }
+
+    nav.topnav {
+      position: sticky; top: 0; background: rgba(10, 14, 26, 0.85);
+      backdrop-filter: blur(12px); border-bottom: 1px solid var(--border);
+      z-index: 100; padding: 14px 24px; display: flex; gap: 20px; align-items: center;
+    }
+    nav.topnav .brand { font-weight: 700; letter-spacing: -0.02em; color: var(--accent); font-size: 17px; margin-right: auto; font-family: var(--mono); }
+    nav.topnav a { color: var(--text-dim); text-decoration: none; font-size: 13px; transition: color 0.15s; }
+    nav.topnav a:hover { color: var(--text); }
+
+    main { max-width: 1000px; margin: 0 auto; padding: 24px 24px 96px; }
+    section { margin-bottom: 80px; scroll-margin-top: 80px; }
+    section h2 { font-size: 30px; letter-spacing: -0.02em; margin-bottom: 8px; font-weight: 700; }
+    section h2 .num { color: var(--text-dim); font-weight: 400; margin-right: 14px; font-family: var(--mono); font-size: 22px; }
+    section .lede { color: var(--text-dim); font-size: 16px; margin-bottom: 28px; max-width: 760px; }
+    p { color: var(--text-dim); max-width: 760px; margin-bottom: 14px; }
+    p strong, li strong { color: var(--text); font-weight: 600; }
+    code.inline { font-family: var(--mono); font-size: 0.88em; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; color: var(--accent); }
+
+    /* Hero */
+    .hero { padding: 60px 0 32px; border-bottom: 1px solid var(--border); margin-bottom: 56px; }
+    .hero .kicker { font-family: var(--mono); color: var(--accent); font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 16px; }
+    .hero h1 { font-size: 52px; letter-spacing: -0.04em; line-height: 1.05; font-weight: 700; margin-bottom: 20px; }
+    .hero h1 .accent { background: linear-gradient(135deg, var(--accent), var(--accent-warm)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { color: var(--text-dim); font-size: 18px; max-width: 720px; }
+    .hero .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-top: 36px; }
+    .stat { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+    .stat .v { font-size: 24px; font-weight: 700; color: var(--accent); font-family: var(--mono); letter-spacing: -0.02em; }
+    .stat .l { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 6px; }
+
+    /* Cards / flow */
+    .panel { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+    .flow-svg { width: 100%; height: auto; display: block; }
+    .flow-svg .node rect { fill: var(--bg-deep); stroke: var(--border); stroke-width: 1.5; }
+    .flow-svg .title { fill: var(--text); font-family: var(--sans); font-weight: 600; }
+    .flow-svg .sub { fill: var(--text-dim); font-family: var(--mono); }
+    .flow-svg .lbl { fill: var(--text-dim); font-family: var(--mono); }
+    .flow-svg .ret { fill: var(--accent-warm); font-family: var(--mono); }
+    .flow-svg .arr { stroke: var(--accent); stroke-width: 1.6; fill: none; marker-end: url(#ah); }
+    .flow-svg .arrb { stroke: var(--accent-warm); stroke-width: 1.6; fill: none; marker-end: url(#ahb); stroke-dasharray: 5 4; }
+
+    /* Code blocks */
+    .code { position: relative; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 10px; margin: 14px 0 18px; overflow: hidden; }
+    .code .bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02); }
+    .code .bar .name { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+    .code .copy { font-family: var(--mono); font-size: 11px; color: var(--text-dim); background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 3px 9px; cursor: pointer; transition: all .15s; }
+    .code .copy:hover { color: var(--text); border-color: var(--accent); }
+    .code pre { padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 13px; line-height: 1.65; color: var(--text); }
+    .code pre .c { color: var(--text-dim); }       /* comment */
+    .code pre .k { color: var(--accent-warm); }     /* keyword/cmd */
+    .code pre .s { color: var(--good); }            /* string/value */
+    .expect { font-family: var(--mono); font-size: 12.5px; color: var(--good); margin: -8px 0 22px 4px; }
+    .expect::before { content: "→ "; color: var(--text-dim); }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 8px; font-size: 14px; }
+    th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--text-dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+    td code { font-family: var(--mono); font-size: 0.9em; color: var(--accent); }
+    tr:last-child td { border-bottom: none; }
+
+    /* Status pills */
+    .pill { font-family: var(--mono); font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 20px; display: inline-block; }
+    .p200 { color: var(--good); background: rgba(126,231,135,0.12); }
+    .p401 { color: var(--bad); background: rgba(248,81,73,0.12); }
+    .p429 { color: var(--warn); background: rgba(241,196,15,0.12); }
+    .p503 { color: var(--accent-warm); background: rgba(247,129,102,0.12); }
+
+    .note { border-left: 3px solid var(--accent); background: var(--bg-elev); border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 18px 0; }
+    .note p { margin: 0; color: var(--text-dim); }
+    ol.steps { list-style: none; counter-reset: s; margin-top: 8px; }
+    ol.steps > li { counter-increment: s; position: relative; padding-left: 44px; margin-bottom: 30px; }
+    ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 8px; background: var(--bg-elev); border: 1px solid var(--border); color: var(--accent); font-family: var(--mono); font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    ol.steps > li h3 { font-size: 17px; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <nav class="topnav">
+    <span class="brand">mint /demo</span>
+    <a href="#what">What it is</a>
+    <a href="#flow">Request flow</a>
+    <a href="#api">Endpoints</a>
+    <a href="#integrate">Integration</a>
+    <a href="#demo">Run the demo</a>
+    <a href="design.html">← Design doc</a>
+  </nav>
+
+  <main>
+    <!-- HERO -->
+    <header class="hero">
+      <div class="kicker">Chunk J · the consumer</div>
+      <h1>The Mint <span class="accent">demo product</span></h1>
+      <p>A throwaway stock-price API that stands in for <em>any backend a customer runs</em>. Its only job is to prove Mint works: one line of middleware, and it gets API-key auth, rate limiting, and monthly quotas — enforced on every request, with zero security code in its handlers.</p>
+      <div class="stats">
+        <div class="stat"><div class="v">1 line</div><div class="l">to integrate Mint</div></div>
+        <div class="stat"><div class="v">0 lines</div><div class="l">of auth in handlers</div></div>
+        <div class="stat"><div class="v">200·401·429·503</div><div class="l">verdicts enforced</div></div>
+        <div class="stat"><div class="v">7 / 7</div><div class="l">e2e tests green</div></div>
+      </div>
+    </header>
+
+    <!-- WHAT -->
+    <section id="what">
+      <h2><span class="num">01</span>What it is</h2>
+      <p class="lede">The prices are fake and beside the point. Think of it as a placeholder for a real service that needs to charge and protect an API.</p>
+      <p>The demo is a tiny HTTP service — a <strong>stock-price API</strong> — living in its own Go module <code class="inline">demo/</code>. It imports the Mint client SDK (<code class="inline">keyservice-go</code>) the same way a real customer would: as an external dependency. Every route it exposes is gated by Mint, so an unknown key, a key over its rate limit, or a key past its monthly quota never reaches the handler.</p>
+      <p>That makes it the <strong>"customer's app"</strong> half of the picture. Mint is the central gate; the demo product is one of the many backends that consult it on every request — exactly how a backend calls Mint's <code class="inline">/validate</code> in production.</p>
+    </section>
+
+    <!-- FLOW -->
+    <section id="flow">
+      <h2><span class="num">02</span>How a request flows</h2>
+      <p class="lede">A caller hits the demo product with a Bearer key. The product's middleware asks Mint to rule on it, then either serves the price or returns Mint's rejection.</p>
+      <div class="panel">
+        <svg class="flow-svg" viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#58a6ff"/></marker>
+            <marker id="ahb" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#f78166"/></marker>
+          </defs>
+
+          <!-- nodes -->
+          <g class="node"><rect x="12" y="70" width="190" height="92" rx="10"/>
+            <text class="title" x="107" y="104" text-anchor="middle" font-size="15">Caller</text>
+            <text class="sub" x="107" y="126" text-anchor="middle" font-size="11">cmd/burst · curl</text>
+            <text class="sub" x="107" y="144" text-anchor="middle" font-size="11">Bearer &lt;key&gt;</text></g>
+
+          <g class="node"><rect x="272" y="70" width="190" height="92" rx="10"/>
+            <text class="title" x="367" y="100" text-anchor="middle" font-size="15">Demo product</text>
+            <text class="sub" x="367" y="122" text-anchor="middle" font-size="11">:9000</text>
+            <text class="sub" x="367" y="142" text-anchor="middle" font-size="11">client.Middleware</text></g>
+
+          <g class="node"><rect x="532" y="70" width="190" height="92" rx="10"/>
+            <text class="title" x="627" y="100" text-anchor="middle" font-size="15">Mint</text>
+            <text class="sub" x="627" y="122" text-anchor="middle" font-size="11">nginx → keyservice</text>
+            <text class="sub" x="627" y="142" text-anchor="middle" font-size="11">POST /v1/validate</text></g>
+
+          <g class="node"><rect x="792" y="70" width="196" height="92" rx="10"/>
+            <text class="title" x="890" y="100" text-anchor="middle" font-size="15">Redis · Postgres</text>
+            <text class="sub" x="890" y="122" text-anchor="middle" font-size="11">cache · RL · quota</text>
+            <text class="sub" x="890" y="142" text-anchor="middle" font-size="11">source of truth</text></g>
+
+          <!-- forward arrows -->
+          <path class="arr" d="M202,108 L270,108"/>
+          <text class="lbl" x="236" y="98" text-anchor="middle" font-size="10">GET price</text>
+          <path class="arr" d="M462,108 L530,108"/>
+          <text class="lbl" x="496" y="98" text-anchor="middle" font-size="10">validate</text>
+          <path class="arr" d="M722,108 L790,108"/>
+          <text class="lbl" x="756" y="98" text-anchor="middle" font-size="10">lookup + Lua</text>
+
+          <!-- return arrow -->
+          <path class="arrb" d="M890,200 L107,200 L107,166"/>
+          <text class="ret" x="500" y="190" text-anchor="middle" font-size="11">verdict → 200 served · 401 invalid · 429 rate/quota · 503 Mint unreachable (fail-closed)</text>
+        </svg>
+      </div>
+      <div class="note"><p>The key idea: the demo product holds <strong>no secrets and no auth logic</strong>. It can't validate keys itself (that needs the pepper, Postgres, Redis) — it asks Mint over HTTP. The coupling is the <code class="inline">/validate</code> contract, nothing more.</p></div>
+    </section>
+
+    <!-- API -->
+    <section id="api">
+      <h2><span class="num">03</span>The endpoints</h2>
+      <p class="lede">Two product routes plus an identity echo. All three sit behind the same one-line gate.</p>
+      <table>
+        <thead><tr><th>Method &amp; path</th><th>Returns</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>GET /v1/price/{symbol}</code></td><td><code>{"symbol":"AAPL","usd":412.07,...}</code></td><td>The "product" — a fake live price. The cheap endpoint the burst tool hammers.</td></tr>
+          <tr><td><code>GET /v1/whoami</code></td><td><code>{"tenant":"...","key":"..."}</code></td><td>Echoes who Mint authenticated — proves the tenant/key landed in the request context.</td></tr>
+        </tbody>
+      </table>
+      <p>Behind the scenes Mint can answer four ways, and the middleware maps each to an HTTP status the caller sees:</p>
+      <table>
+        <thead><tr><th>Situation</th><th>Caller gets</th></tr></thead>
+        <tbody>
+          <tr><td>Valid key, within limits</td><td><span class="pill p200">200</span> price served</td></tr>
+          <tr><td>Missing / unknown / revoked key</td><td><span class="pill p401">401</span> invalid</td></tr>
+          <tr><td>Over rate limit, or over monthly quota</td><td><span class="pill p429">429</span> too many requests</td></tr>
+          <tr><td>Mint unreachable</td><td><span class="pill p503">503</span> fail-closed (no silent pass)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- INTEGRATE -->
+    <section id="integrate">
+      <h2><span class="num">04</span>The one-line integration</h2>
+      <p class="lede">This is the whole point. The handlers are pure business logic; a single wrap makes every route authenticated, rate-limited, and metered.</p>
+      <div class="code">
+        <div class="bar"><span class="name">demo/product/product.go</span><button class="copy">copy</button></div>
+        <pre><span class="c">// Handler wires the routes and wraps them in Mint's auth middleware.</span>
+<span class="k">func</span> Handler(client *keysvc.Client) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc(<span class="s">"GET /v1/price/{symbol}"</span>, price)
+	mux.HandleFunc(<span class="s">"GET /v1/whoami"</span>, whoami)
+	<span class="k">return</span> client.Middleware(mux) <span class="c">// ← gates EVERY route above, one line</span>
+}
+
+<span class="c">// Inside a handler, the caller's identity is just there — Mint put it</span>
+<span class="c">// in the context. No token parsing, no rate-limit check, no quota math.</span>
+<span class="k">func</span> price(w http.ResponseWriter, r *http.Request) {
+	tenant, _ := keysvc.TenantID(r.Context())
+	<span class="c">// ... serve the price ...</span>
+}</pre>
+      </div>
+      <p>Compare that to the alternative: every handler hand-rolling token extraction, a call to validate, rate-limit bookkeeping, quota accounting, and the right status codes. The middleware collapses ~40 lines of per-endpoint plumbing into one wrap — and new routes are protected automatically.</p>
+    </section>
+
+    <!-- DEMO -->
+    <section id="demo">
+      <h2><span class="num">05</span>Run the demo</h2>
+      <p class="lede">Step 2 shows integration, Step 3 shows enforcement live, Step 4 shows it on the dashboards. Assumes the Mint stack is up (<code class="inline">docker compose up -d</code>).</p>
+
+      <ol class="steps">
+        <li>
+          <h3>Start the demo service</h3>
+          <div class="code"><div class="bar"><span class="name">bash</span><button class="copy">copy</button></div>
+<pre><span class="k">docker compose up -d --build demo</span>
+<span class="c"># or, without Docker, from the demo/ folder:</span>
+<span class="k">cd</span> demo &amp;&amp; <span class="k">go run</span> .</pre></div>
+        </li>
+
+        <li>
+          <h3>Provision a customer (tenant + API key)</h3>
+          <div class="code"><div class="bar"><span class="name">bash</span><button class="copy">copy</button></div>
+<pre>TID=$(curl -s -XPOST localhost:8080/admin/tenants \
+  -H <span class="s">'X-Admin-Token: just-works-for-now'</span> -H <span class="s">'content-type: application/json'</span> \
+  -d <span class="s">'{"name":"demo-co"}'</span> | jq -r .id)
+KEY=$(curl -s -XPOST localhost:8080/v1/tenants/$TID/keys \
+  -H <span class="s">'X-Admin-Token: just-works-for-now'</span> -H <span class="s">'content-type: application/json'</span> \
+  -d <span class="s">'{"name":"laptop"}'</span> | jq -r .key)
+<span class="k">echo</span> <span class="s">"tenant=$TID  key=$KEY"</span></pre></div>
+        </li>
+
+        <li>
+          <h3>The happy path &amp; the gate</h3>
+          <div class="code"><div class="bar"><span class="name">bash</span><button class="copy">copy</button></div>
+<pre><span class="c"># valid key → a price, and it knows who you are</span>
+curl -s localhost:9000/v1/price/AAPL -H <span class="s">"Authorization: Bearer $KEY"</span>; <span class="k">echo</span>
+curl -s localhost:9000/v1/whoami     -H <span class="s">"Authorization: Bearer $KEY"</span>; <span class="k">echo</span>
+
+<span class="c"># no key → blocked before the handler ever runs</span>
+curl -si localhost:9000/v1/price/AAPL | head -1</pre></div>
+          <div class="expect"><span class="pill p200">200</span> price + your tenant id &nbsp;·&nbsp; no key → <span class="pill p401">401</span></div>
+        </li>
+
+        <li>
+          <h3>Watch Mint enforce — the money shot</h3>
+          <div class="code"><div class="bar"><span class="name">bash · rate limit</span><button class="copy">copy</button></div>
+<pre><span class="k">cd</span> demo
+<span class="c"># poll too fast → 200s turn into 429s</span>
+<span class="k">go run</span> ./cmd/burst -key <span class="s">"$KEY"</span> -n 2000 -c 50</pre></div>
+          <div class="expect">a few hundred <span style="color:var(--good)">allowed</span> (the burst allowance), the rest <span style="color:var(--warn)">rate_limited</span></div>
+
+          <div class="code"><div class="bar"><span class="name">bash · quota</span><button class="copy">copy</button></div>
+<pre><span class="c"># a free-tier customer capped at 50 calls total</span>
+TID2=$(curl -s -XPOST localhost:8080/admin/tenants \
+  -H <span class="s">'X-Admin-Token: just-works-for-now'</span> -H <span class="s">'content-type: application/json'</span> \
+  -d <span class="s">'{"name":"free-tier","monthly_quota":50}'</span> | jq -r .id)
+KEY2=$(curl -s -XPOST localhost:8080/v1/tenants/$TID2/keys \
+  -H <span class="s">'X-Admin-Token: just-works-for-now'</span> -H <span class="s">'content-type: application/json'</span> \
+  -d <span class="s">'{"name":"k"}'</span> | jq -r .key)
+<span class="k">go run</span> ./cmd/burst -key <span class="s">"$KEY2"</span> -n 300 -c 20</pre></div>
+          <div class="expect"><span style="color:var(--good)">allowed</span> ≈ 50, then <span style="color:var(--warn)">quota_exceeded</span> climbs</div>
+
+          <div class="code"><div class="bar"><span class="name">bash · stolen key</span><button class="copy">copy</button></div>
+<pre><span class="k">go run</span> ./cmd/burst -key <span class="s">"ak_live_garbage"</span> -n 50 -c 10</pre></div>
+          <div class="expect"><span style="color:var(--bad)">invalid</span> = 50 — a fake key gets nothing</div>
+        </li>
+
+        <li>
+          <h3>See it on the dashboards</h3>
+          <p>While a burst runs, open <a href="http://localhost:3000" style="color:var(--accent)">Grafana at :3000</a> (no login). <strong>Service health</strong> shows the request wave, p99 latency, and rate/quota rejects ticking up; <strong>Tenants &amp; quotas</strong> shows <code class="inline">free-tier</code> filling toward its 50-call cap.</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- PROVES -->
+    <section id="proves">
+      <h2><span class="num">06</span>What it proves</h2>
+      <p class="lede">The same matrix is asserted automatically by the end-to-end test suite (<code class="inline">integration/</code>), run two ways — testcontainers by default, or <code class="inline">-tags live</code> against your running stack.</p>
+      <table>
+        <thead><tr><th>Scenario</th><th>Result</th><th>Mint feature exercised</th></tr></thead>
+        <tbody>
+          <tr><td>Valid key</td><td><span class="pill p200">200</span></td><td>auth · cache · context injection</td></tr>
+          <tr><td>Missing / garbage key</td><td><span class="pill p401">401</span></td><td>fail-closed auth</td></tr>
+          <tr><td>Revoked key</td><td><span class="pill p401">401</span></td><td>pub/sub cache invalidation</td></tr>
+          <tr><td>Over rate limit</td><td><span class="pill p429">429</span></td><td>token bucket (Redis Lua)</td></tr>
+          <tr><td>Over monthly quota</td><td><span class="pill p429">429</span></td><td>quota counter + meter</td></tr>
+          <tr><td>Mint unreachable</td><td><span class="pill p503">503</span></td><td>fail-closed by default</td></tr>
+        </tbody>
+      </table>
+      <div class="code"><div class="bar"><span class="name">bash</span><button class="copy">copy</button></div>
+<pre><span class="k">go</span> -C integration test -tags live ./...   <span class="c"># fast: against your up stack</span>
+<span class="k">go</span> -C integration test ./...              <span class="c"># hermetic: spins its own stack</span></pre></div>
+    </section>
+  </main>
+
+  <script>
+    document.querySelectorAll('.copy').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pre = btn.closest('.code').querySelector('pre');
+        navigator.clipboard.writeText(pre.innerText);
+        const old = btn.textContent; btn.textContent = 'copied'; btn.style.color = 'var(--good)';
+        setTimeout(() => { btn.textContent = old; btn.style.color = ''; }, 1200);
+      });
+    });
+  </script>
+</body>
+</html>

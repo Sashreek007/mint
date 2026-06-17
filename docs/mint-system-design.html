@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mint — System Design</title>
+<style>
+  :root {
+    --bg: #faf9f6; --surface: #ffffff; --fg: #1c1c1a; --muted: #5f5e5a; --faint: #8a8980;
+    --border: #e6e4dd; --accent: #4f46e5; --accent-bg: #eef0ff;
+    --must: #16a34a; --must-bg: #eaf6ed; --should: #2563eb; --should-bg: #e8f0fe;
+    --could: #d97706; --could-bg: #fdf2e2; --wont: #6b7280; --wont-bg: #f1f1ee;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18; --surface: #232320; --fg: #ececea; --muted: #b3b2ac; --faint: #87867f;
+      --border: #36352f; --accent: #a5a0ff; --accent-bg: #26253a;
+      --must:#4ade80; --must-bg:#16271c; --should:#7aa7ff; --should-bg:#172238;
+      --could:#f0b35a; --could-bg:#2c2310; --wont:#9ca3af; --wont-bg:#26261f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); line-height: 1.65; font-size: 16px; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+  header.doc { border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 2rem; }
+  header.doc h1 { font-size: 1.8rem; margin: 0 0 .3rem; font-weight: 600; }
+  header.doc .desc { color: var(--muted); margin: .3rem 0 0; }
+  header.doc .links { margin-top: .8rem; font-size: .85rem; }
+  header.doc .links a { color: var(--accent); text-decoration: none; margin-right: 1rem; }
+  h2.section { font-size: 1.4rem; margin: 3rem 0 .4rem; font-weight: 600; padding-top: .6rem; }
+  h2.section .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+  h3 { font-size: 1.08rem; margin: 1.7rem 0 .5rem; font-weight: 600; }
+  h4 { font-size: .98rem; margin: 1.2rem 0 .3rem; font-weight: 600; color: var(--muted); }
+  p { margin: .6rem 0; }
+  b { color: var(--fg); }
+  code { font-family: var(--mono); background: var(--accent-bg); color: var(--accent); padding: .08em .38em; border-radius: 5px; font-size: .86em; }
+
+  /* code snippets */
+  .snip { margin: 1.1rem 0 1.3rem; }
+  .snip .fname { font-family: var(--mono); font-size: .72rem; color: var(--faint); background: var(--surface);
+                 border: 1px solid var(--border); border-bottom: none; border-radius: 9px 9px 0 0; padding: .45rem .85rem; }
+  .snip .fname b { color: var(--accent); font-weight: 600; }
+  .snip pre { margin: 0; border-radius: 0 0 9px 9px; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: .85rem 1rem;
+        overflow-x: auto; font-family: var(--mono); font-size: .79rem; line-height: 1.55; color: var(--fg); }
+  pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+  .snip .cap { font-size: .85rem; color: var(--muted); margin: .4rem 0 0; }
+
+  /* roadmap */
+  .roadmap { list-style: none; padding: 0; margin: 1rem 0 0; display: grid; gap: .45rem; }
+  .roadmap li { display: flex; align-items: baseline; gap: .7rem; padding: .5rem .85rem; background: var(--surface);
+                border: 1px solid var(--border); border-radius: 9px; }
+  .roadmap .st { font-size: .68rem; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; padding: .12em .5em;
+                 border-radius: 20px; white-space: nowrap; background: var(--must-bg); color: var(--must); }
+  .roadmap .rl { color: var(--muted); }
+
+  .concept { background: var(--accent-bg); border-left: 3px solid var(--accent); border-radius: 0 9px 9px 0; padding: .85rem 1.1rem; margin: 1rem 0; }
+  .concept .lab { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: .25rem; }
+  .concept p { margin: .15rem 0; font-size: .95rem; }
+
+  .highlight { background: var(--could-bg); border-left: 3px solid var(--could); border-radius: 0 9px 9px 0; padding: .85rem 1.1rem; margin: 1rem 0; }
+  .highlight .lab { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--could); display: block; margin-bottom: .25rem; }
+
+  .tier { border: 1px solid var(--border); border-radius: 11px; overflow: hidden; margin: .9rem 0; background: var(--surface); }
+  .tier > .head { display: flex; align-items: center; gap: .6rem; padding: .55rem .9rem; font-weight: 600; }
+  .tier .pill { font-size: .7rem; font-weight: 700; letter-spacing: .04em; padding: .15em .6em; border-radius: 20px; }
+  .tier .sub { color: var(--muted); font-weight: 400; font-size: .88rem; }
+  .tier ol { margin: 0; padding: .3rem 1.2rem .9rem 2.4rem; }
+  .tier li { margin: .32rem 0; }
+  .tier.must  { border-color: var(--must); }   .tier.must .pill  { background: var(--must-bg); color: var(--must); }
+  .tier.should{ border-color: var(--should); } .tier.should .pill{ background: var(--should-bg); color: var(--should); }
+  .tier.could { border-color: var(--could); }  .tier.could .pill { background: var(--could-bg); color: var(--could); }
+  .tier.wont  { border-color: var(--wont); }   .tier.wont .pill  { background: var(--wont-bg); color: var(--wont); }
+  .tier.must  > .head { background: var(--must-bg); }
+  .tier.should> .head { background: var(--should-bg); }
+  .tier.could > .head { background: var(--could-bg); }
+  .tier.wont  > .head { background: var(--wont-bg); }
+
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .9rem; }
+  th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th { background: var(--surface); font-weight: 600; border-bottom: 2px solid var(--border); }
+  td.force { color: var(--accent); }
+  tbody tr:hover { background: var(--accent-bg); }
+  td .slo, .slo { font-family: var(--mono); font-size: .85em; }
+  .ok { color: var(--must); font-weight: 600; } .miss { color: var(--could); font-weight: 600; }
+
+  .decision { border: 1px solid var(--border); border-radius: 11px; margin: 1.1rem 0; overflow: hidden; background: var(--surface); }
+  .decision .dh { background: var(--accent-bg); padding: .55rem .95rem; font-weight: 600; display:flex; gap:.5rem; align-items:center; }
+  .decision .dh .tag { font-size:.68rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color: var(--accent); }
+  .decision .body { padding: .3rem .95rem 1rem; }
+  .decision .opt { margin: .5rem 0; padding-left: 1.5rem; position: relative; }
+  .decision .opt::before { content: "○"; position: absolute; left: 0; color: var(--faint); }
+  .decision .opt.win::before { content: "●"; color: var(--must); }
+  .decision .opt .name { font-weight: 600; }
+  .decision .opt.win .name { color: var(--must); }
+  .decision .why { margin-top: .7rem; padding: .6rem .8rem; background: var(--must-bg); border-radius: 8px; font-size: .92rem; }
+  .decision .why b { color: var(--must); }
+
+  .locked { background: var(--surface); border: 1px dashed var(--accent); border-radius: 11px; padding: .9rem 1.1rem; margin: 1.4rem 0; }
+  .locked h3 { margin-top: .2rem; }
+  .locked ul { margin: .3rem 0; padding-left: 1.2rem; } .locked li { margin: .3rem 0; }
+  .note { color: var(--muted); font-size: .9rem; font-style: italic; }
+  svg { width: 100%; height: auto; display: block; margin: 1.2rem auto; }
+  .legend { font-size: 11px; fill: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <h1>Mint — System Design</h1>
+  <p class="desc">A Go service that issues, validates, and meters API keys for other backends. Every incoming request to a customer's service triggers one <code>POST /v1/validate</code> — a single Redis round-trip on a cache hit — that checks key + rate limit + quota. Postgres is the source of truth and off the hot path entirely. <b>Built, measured, and shown with the real code.</b></p>
+  <p class="links">
+    <a href="design.html">↳ Build log &amp; glossary</a>
+    <a href="demo.html">↳ Demo product walkthrough</a>
+  </p>
+</header>
+
+<section>
+  <h3>What's in this doc</h3>
+  <p class="note">This reverse-maps the running system back onto its design: the requirements that shaped it, the capacity math, the architecture, and a deep dive into each component with the actual code that implements it.</p>
+  <ol class="roadmap">
+    <li><span class="st">done</span><span class="rl">0 · Orientation — the shape before the detail</span></li>
+    <li><span class="st">done</span><span class="rl">1 · Requirements — functional, SLOs, and the core trade-offs</span></li>
+    <li><span class="st">done</span><span class="rl">2 · Capacity estimates &amp; the measured numbers</span></li>
+    <li><span class="st">done</span><span class="rl">3 · Architecture, the /validate pipeline &amp; deployment</span></li>
+    <li><span class="st">done</span><span class="rl">4 · API contract &amp; data model</span></li>
+    <li><span class="st">done</span><span class="rl">5 · Component deep dives (keys · cache · the gate · flusher · observability)</span></li>
+    <li><span class="st">done</span><span class="rl">6 · The client SDK, the demo consumer &amp; end-to-end tests</span></li>
+    <li><span class="st">done</span><span class="rl">7 · Results — what was measured</span></li>
+  </ol>
+</section>
+
+<h2 class="section"><span class="num">0.</span> Orientation</h2>
+<p class="note">Two pictures to anchor everything below: who talks to whom, and the journey of a single <code>/validate</code> request.</p>
+
+<h3>System context — who talks to whom</h3>
+<p>Other backends adopt Mint by wrapping their router in one line of the <code>keyservice-go</code> SDK. From then on, every request they receive triggers a <code>/validate</code> to Mint, which leans on Redis for the hot path and Postgres as the durable source of truth.</p>
+<svg viewBox="0 0 700 300" role="img" aria-label="System context: a customer backend uses the SDK to call Mint through nginx, which load-balances two stateless keyservice replicas backed by Redis and Postgres">
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/></marker></defs>
+  <rect x="20" y="112" width="140" height="64" rx="7" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="90" y="138" text-anchor="middle" style="font-size:13px;fill:var(--fg)">customer backend</text>
+  <text x="90" y="156" text-anchor="middle" style="font-size:11px;fill:var(--muted)">keyservice-go SDK</text>
+  <rect x="232" y="118" width="92" height="52" rx="7" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="278" y="140" text-anchor="middle" style="font-size:13px;fill:var(--fg)">nginx</text>
+  <text x="278" y="157" text-anchor="middle" style="font-size:11px;fill:var(--muted)">LB · :8080</text>
+  <rect x="392" y="104" width="150" height="80" rx="7" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="467" y="136" text-anchor="middle" style="font-size:14px;fill:var(--fg)">keyservice ×2</text>
+  <text x="467" y="154" text-anchor="middle" style="font-size:11px;fill:var(--muted)">stateless · the gate</text>
+  <rect x="372" y="232" width="120" height="48" rx="7" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="432" y="254" text-anchor="middle" style="font-size:13px;fill:var(--fg)">postgres</text>
+  <text x="432" y="270" text-anchor="middle" style="font-size:11px;fill:var(--muted)">source of truth</text>
+  <rect x="520" y="232" width="150" height="48" rx="7" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="595" y="254" text-anchor="middle" style="font-size:13px;fill:var(--fg)">redis</text>
+  <text x="595" y="270" text-anchor="middle" style="font-size:11px;fill:var(--muted)">cache · rate · quota · usage</text>
+  <line x1="160" y1="144" x2="228" y2="144" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="194" y="135" text-anchor="middle" style="font-size:10px;fill:var(--muted)">/validate</text>
+  <line x1="324" y1="144" x2="388" y2="144" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="356" y="135" text-anchor="middle" style="font-size:10px;fill:var(--muted)">round-robin</text>
+  <line x1="455" y1="184" x2="438" y2="229" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="423" y="212" text-anchor="end" style="font-size:10px;fill:var(--muted)">miss only</text>
+  <line x1="490" y1="184" x2="565" y2="229" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="556" y="212" style="font-size:10px;fill:var(--muted)">every req</text>
+  <rect x="372" y="290" width="11" height="11" rx="2" fill="var(--surface)" stroke="var(--border)"/>
+  <text x="390" y="299" class="legend" style="font-size:11px">external / durable</text>
+  <rect x="520" y="290" width="11" height="11" rx="2" fill="var(--accent-bg)" stroke="var(--accent)"/>
+  <text x="538" y="299" class="legend" style="font-size:11px">Mint (the hot path)</text>
+</svg>
+
+<h3>Request lifecycle — a single /validate</h3>
+<p>The branch is the whole performance story: a <b>cache hit</b> answers from RAM (L1) or one Redis hop (L2) with no Postgres at all; a <b>miss</b> falls through to a single indexed Postgres lookup, then writes the answer back into both cache tiers so the next identical key is warm. A valid key then passes through <b>one</b> Redis Lua call that does rate-limit + quota + metering together.</p>
+<svg viewBox="0 0 700 470" role="img" aria-label="Validate lifecycle: hash the key, look up L1 then L2 then Postgres, fail-closed 401 if invalid, otherwise one Lua gate returns 200, 429 rate, or 429 quota">
+  <defs><marker id="b" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/></marker>
+  <marker id="bg" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--must)"/></marker>
+  <marker id="br" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--could)"/></marker></defs>
+  <rect x="150" y="20" width="220" height="40" rx="7" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="260" y="44" text-anchor="middle" style="font-size:13px;fill:var(--fg)">POST /v1/validate · Bearer key</text>
+  <rect x="150" y="80" width="220" height="44" rx="7" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="260" y="100" text-anchor="middle" style="font-size:13px;fill:var(--fg)">hash key — HMAC-SHA256 + pepper</text>
+  <text x="260" y="116" text-anchor="middle" style="font-size:11px;fill:var(--muted)">deterministic → the lookup index</text>
+  <rect x="150" y="144" width="220" height="60" rx="7" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="260" y="168" text-anchor="middle" style="font-size:13px;fill:var(--fg)">resolve key</text>
+  <text x="260" y="185" text-anchor="middle" style="font-size:11px;fill:var(--muted)">L1 (RAM) → L2 (Redis) → Postgres</text>
+  <text x="260" y="199" text-anchor="middle" style="font-size:10px;fill:var(--accent)">hit = 0–1 network hops · write-through on miss</text>
+  <rect x="150" y="224" width="220" height="44" rx="7" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="260" y="244" text-anchor="middle" style="font-size:13px;fill:var(--fg)">valid &amp; active?</text>
+  <text x="260" y="259" text-anchor="middle" style="font-size:11px;fill:var(--muted)">key + tenant, one JOIN</text>
+  <rect x="430" y="224" width="180" height="44" rx="7" fill="var(--could-bg)" stroke="var(--could)" stroke-width="1.5"/>
+  <text x="520" y="244" text-anchor="middle" style="font-size:13px;fill:var(--fg)">401 — fail closed</text>
+  <text x="520" y="259" text-anchor="middle" style="font-size:11px;fill:var(--could)">bare {valid:false}, no reason</text>
+  <rect x="150" y="288" width="220" height="60" rx="7" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="260" y="312" text-anchor="middle" style="font-size:13px;fill:var(--fg)">the gate — ONE Redis Lua call</text>
+  <text x="260" y="329" text-anchor="middle" style="font-size:11px;fill:var(--muted)">token bucket + quota + usage INCR</text>
+  <text x="260" y="343" text-anchor="middle" style="font-size:10px;fill:var(--accent)">3-way verdict, atomic</text>
+  <rect x="430" y="296" width="180" height="44" rx="7" fill="var(--could-bg)" stroke="var(--could)" stroke-width="1.5"/>
+  <text x="520" y="316" text-anchor="middle" style="font-size:13px;fill:var(--fg)">429 — over limit</text>
+  <text x="520" y="331" text-anchor="middle" style="font-size:11px;fill:var(--could)">rate OR monthly quota</text>
+  <rect x="150" y="396" width="220" height="44" rx="7" fill="var(--must-bg)" stroke="var(--must)" stroke-width="1.5"/>
+  <text x="260" y="416" text-anchor="middle" style="font-size:13px;fill:var(--fg)">200 — {tenant_id, key_id}</text>
+  <text x="260" y="431" text-anchor="middle" style="font-size:11px;fill:var(--must)">served + metered</text>
+  <line x1="260" y1="60" x2="260" y2="78" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#b)"/>
+  <line x1="260" y1="124" x2="260" y2="142" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#b)"/>
+  <line x1="260" y1="204" x2="260" y2="222" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#b)"/>
+  <line x1="370" y1="246" x2="428" y2="246" stroke="var(--could)" stroke-width="1.5" marker-end="url(#br)"/>
+  <text x="399" y="238" text-anchor="middle" style="font-size:10px;fill:var(--could)">no</text>
+  <line x1="260" y1="268" x2="260" y2="286" stroke="var(--must)" stroke-width="1.5" marker-end="url(#bg)"/>
+  <text x="272" y="281" style="font-size:10px;fill:var(--must)">yes</text>
+  <line x1="370" y1="318" x2="428" y2="318" stroke="var(--could)" stroke-width="1.5" marker-end="url(#br)"/>
+  <line x1="260" y1="348" x2="260" y2="394" stroke="var(--must)" stroke-width="1.5" marker-end="url(#bg)"/>
+  <text x="272" y="374" style="font-size:10px;fill:var(--must)">within limit</text>
+</svg>
+
+<h2 class="section"><span class="num">1.</span> Requirements</h2>
+
+<div class="concept">
+  <span class="lab">Concept · functional vs non-functional</span>
+  <p><b>Functional (FR)</b> = <i>what</i> the system does (a feature). <b>Non-functional (NFR)</b> = <i>how well</i> — latency, throughput, availability, security. The NFRs are what shape this architecture: anyone can validate a key; doing it 5,000×/second under 20 ms is the hard part.</p>
+</div>
+
+<h3>Functional requirements (MoSCoW)</h3>
+<div class="tier must">
+  <div class="head"><span class="pill">MUST</span> The core <span class="sub">— the product is meaningless without these</span></div>
+  <ol>
+    <li><b>Issue keys</b> per tenant — show the plaintext once, store only a hash.</li>
+    <li><b>Validate</b> a key on the hot path: <code>POST /v1/validate</code> → key valid? tenant active?</li>
+    <li><b>Rate-limit</b> per key (burst-tolerant) and <b>meter + quota</b> per tenant per month.</li>
+    <li><b>Revoke</b> a key and have every replica honour it within milliseconds.</li>
+  </ol>
+</div>
+<div class="tier should">
+  <div class="head"><span class="pill">SHOULD</span> What makes it production-grade</div>
+  <ol start="5">
+    <li><b>Cache</b> the hot path so Postgres is off it entirely (L1 + L2 + invalidation).</li>
+    <li><b>Observability</b>: RED metrics, structured logs, readiness, dashboards.</li>
+    <li><b>A drop-in client SDK</b> so a backend integrates in one line.</li>
+  </ol>
+</div>
+<div class="tier wont">
+  <div class="head"><span class="pill">WON'T</span> Out of scope now <span class="sub">— named, so it's a decision</span></div>
+  <ol start="8">
+    <li>Key rotation UI, multi-region, per-endpoint scopes/RBAC, a hosted control-plane dashboard.</li>
+  </ol>
+</div>
+
+<h3>Non-functional requirements &amp; SLOs</h3>
+<div class="concept">
+  <span class="lab">Concept · SLO &amp; fail-mode asymmetry</span>
+  <p>An NFR must be a <b>number</b>. Mint's defining design rule is an <b>asymmetric failure mode</b>: <b>auth fails closed</b> (a doubt → reject; security &gt; availability) while <b>rate-limiting fails open</b> (Redis down → allow; availability &gt; strictness). Same kind of failure, opposite choice, decided by what's at stake.</p>
+</div>
+<table>
+  <thead><tr><th>#</th><th>Requirement</th><th>Target (SLO)</th><th>Forces this design</th><th>Measured</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Validate throughput</td><td><span class="slo">cached ≥ 30k rps</span></td><td class="force">L1/L2 cache; Postgres off the hot path</td><td><span class="miss">18,292 rps</span> (laptop; 30k needs real hw)</td></tr>
+    <tr><td>2</td><td>Tail latency under load</td><td><span class="slo">p99 &lt; 20 ms</span></td><td class="force">thin hot path, one Redis round-trip</td><td><span class="ok">p99 10 ms</span> ✓ (p50 2.2 ms)</td></tr>
+    <tr><td>3</td><td>Metering write reduction</td><td><span class="slo">~500× (5k/s → ~10/s)</span></td><td class="force">Redis INCR + batched flusher</td><td><span class="ok">376×–500×</span> ✓ (~10 writes/s)</td></tr>
+    <tr><td>4</td><td>Cache hit rate</td><td><span class="slo">~99%</span></td><td class="force">5-min TTL, hot-key prewarm</td><td><span class="ok">99.7%</span> ✓ @ 1k keys</td></tr>
+    <tr><td>5</td><td>Image size</td><td><span class="slo">≤ 25 MB</span></td><td class="force">multi-stage build, static binary</td><td><span class="ok">~22 MB</span> ✓</td></tr>
+    <tr><td>6</td><td>Auth failure mode</td><td><span class="slo">fail closed</span></td><td class="force">any doubt → 401; SDK 503 on outage</td><td><span class="ok">✓ tested</span></td></tr>
+    <tr><td>7</td><td>Availability failure mode</td><td><span class="slo">rate-limit fails open</span></td><td class="force">Redis error → allow</td><td><span class="ok">✓</span> by design</td></tr>
+  </tbody>
+</table>
+
+<h3>The core trade-offs</h3>
+<div class="decision">
+  <div class="dh"><span class="tag">Decision 1</span> Key hashing — what runs on every request</div>
+  <div class="body">
+    <div class="opt"><span class="name">Argon2id / bcrypt</span> — memory-hard, deliberately slow. Correct for human passwords.</div>
+    <div class="opt win"><span class="name">HMAC-SHA256 + server-side pepper</span> — microsecond-cheap, keyed by a secret held outside the DB.</div>
+    <div class="why"><b>We pick HMAC + pepper.</b> Hashing runs on the 5,000 rps hot path, so a deliberately-slow KDF would blow the p99 &lt; 20 ms budget. API keys are already high-entropy (≈190 bits) — they don't need the brute-force resistance Argon2id buys for low-entropy passwords. The <b>pepper</b> (an env-var secret, not in Postgres) means a DB-only dump can't be brute-forced offline, and because the hash is <b>deterministic</b> it doubles as the <code>key_hash BYTEA UNIQUE</code> lookup index — one indexed SELECT, no per-row salt to fetch-then-compare.</div>
+  </div>
+</div>
+<div class="decision">
+  <div class="dh"><span class="tag">Decision 2</span> Where do rate-limit + quota + metering run</div>
+  <div class="body">
+    <div class="opt"><span class="name">In Go, per replica</span> — but each replica has its own memory, so counts diverge and a key could exceed its limit ×replicas.</div>
+    <div class="opt"><span class="name">Three separate Redis calls</span> — correct shared state, but 3 round-trips and 3 races on the hot path.</div>
+    <div class="opt win"><span class="name">One atomic Redis Lua script</span> — refill the bucket, check rate, check quota, INCR usage — all in a single round-trip.</div>
+    <div class="why"><b>We pick one Lua call.</b> A read-modify-write across replicas needs Redis-side atomicity that Go locks can't give. Bundling all three into one <code>EVALSHA</code> collapses three races and three round-trips into one — the quota check and the usage INCR ride the round-trip the token bucket already pays. Zero added hot-path latency for two extra features.</div>
+  </div>
+</div>
+<div class="decision">
+  <div class="dh"><span class="tag">Decision 3</span> Usage metering — synchronous or coalesced</div>
+  <div class="body">
+    <div class="opt"><span class="name">Write each request to Postgres</span> — accurate, but ~5,000 writes/s of contention on the money table.</div>
+    <div class="opt win"><span class="name">Redis INCR on the hot path + background flusher</span> — count in Redis, mirror to Postgres every interval.</div>
+    <div class="why"><b>We pick coalescing.</b> The hot path does <b>zero</b> Postgres writes; usage lives as a Redis counter and a background flusher batches it. The Postgres write rate becomes <code>active_tenants / flush_interval</code> — <b>invariant to load</b>. Measured: ~10 writes/s instead of thousands (a 376×–500× reduction). The flusher's UPSERT mirrors the absolute value, so it's idempotent — a double-flush can't corrupt the count.</div>
+  </div>
+</div>
+
+<h2 class="section"><span class="num">2.</span> Capacity estimates &amp; measured numbers</h2>
+
+<div class="concept">
+  <span class="lab">Concept · Little's Law</span>
+  <p>Items in flight = arrival rate × time each spends inside: <code>L = λ × W</code>. For Mint at the 5,000 rps target with a warm-cache service time of ~2 ms, <code>L = 5000 × 0.002 = 10</code> in-flight requests. The hot path is so short that concurrency is trivially small — the engineering isn't holding connections, it's keeping <b>W</b> tiny by never touching Postgres on a hit.</p>
+</div>
+
+<h4>Cache hit rate is an outcome, not a dial</h4>
+<p>With a 5-minute TTL and a working set of <code>U</code> unique keys over <code>N</code> requests, each unique key causes ~one cold miss and is then warm: <code>hit_rate ≈ 1 − U/N</code>. That model predicted, and the load test confirmed, <b>99.7%</b> at 1,000 keys and <b>96.7%</b> at 10,000 keys over 300k requests — the misses are almost exactly one per unique key. The hit rate is a property of the workload's repetition, which is why it's <i>measured</i>, not claimed.</p>
+
+<h4>Write-amplification — the number the flusher kills</h4>
+<p>Naïve per-request metering writes to Postgres at the request rate. Coalescing makes the durable write rate <code>active_tenants / flush_interval</code> — at 300 tenants and a 30 s interval, ~10 writes/s <i>no matter how much traffic arrives</i>. That decoupling is the whole point of Section 1's Decision 3.</p>
+
+<h3>Measured (the honest numbers)</h3>
+<p class="note">Hardware: MacBook Pro, Apple M2 Pro (10 cores), 16 GB. The load generator runs on the <i>same</i> machine as the full stack, so absolute throughput is a floor, not a ceiling — but the before/after deltas are reliable. Every number is reproducible from a committed script in <code>benchmarks/</code>.</p>
+<table>
+  <thead><tr><th>Metric</th><th>Baseline (Postgres-only)</th><th>Cached</th><th>Delta</th></tr></thead>
+  <tbody>
+    <tr><td>Throughput <span class="note">(hey -n 100k -c 50)</span></td><td>12,018 rps</td><td>18,292 rps</td><td class="force">+52%</td></tr>
+    <tr><td>p50 latency</td><td>3.2 ms</td><td>2.2 ms</td><td class="force">−31%</td></tr>
+    <tr><td>p99 latency</td><td>17 ms</td><td>10 ms</td><td class="force">−41%</td></tr>
+  </tbody>
+</table>
+<div class="highlight">
+  <span class="lab">Headline results</span>
+  <p><b>Cache:</b> +52% rps, −41% p99 (cached p99 <b>10 ms</b>, inside the 20 ms SLO). <b>Hit rate:</b> <b>99.7%</b> @ 1k keys (cold start, Zipf, 5% invalid). <b>Write reduction:</b> <b>376×</b> end-to-end (600k offered → 339k metered → 900 Postgres writes), <b>500×</b> metering-isolated, with the durable mirror verified lossless at exactly 600,000. <b>Image:</b> ~22 MB. Realistic mixed workload sustains ~7,000 rps; the C=1000 overload point (5,114 rps, p99 1,115 ms) is reported for honesty — it measures the shared laptop saturating, not Mint's capacity.</p>
+</div>
+
+<h2 class="section"><span class="num">3.</span> Architecture, the pipeline &amp; deployment</h2>
+
+<h3>Component architecture</h3>
+<svg viewBox="0 0 700 340" role="img" aria-label="Architecture: nginx fronts two stateless keyservice replicas; a one-shot migrate container; Postgres and Redis; Prometheus scrapes both replicas directly and feeds Grafana; a demo product calls in through nginx">
+  <defs><marker id="c" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/></marker></defs>
+  <rect x="20" y="60" width="96" height="46" rx="7" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="68" y="82" text-anchor="middle" style="font-size:12px;fill:var(--fg)">demo product</text>
+  <text x="68" y="98" text-anchor="middle" style="font-size:10px;fill:var(--muted)">:9000 · SDK</text>
+  <rect x="150" y="60" width="80" height="46" rx="7" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="190" y="82" text-anchor="middle" style="font-size:12px;fill:var(--fg)">nginx</text>
+  <text x="190" y="98" text-anchor="middle" style="font-size:10px;fill:var(--muted)">8080→80</text>
+  <rect x="266" y="44" width="120" height="36" rx="7" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="326" y="66" text-anchor="middle" style="font-size:12px;fill:var(--fg)">keyservice #1</text>
+  <rect x="266" y="86" width="120" height="36" rx="7" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="326" y="108" text-anchor="middle" style="font-size:12px;fill:var(--fg)">keyservice #2</text>
+  <rect x="430" y="44" width="110" height="46" rx="7" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="485" y="66" text-anchor="middle" style="font-size:12px;fill:var(--fg)">postgres</text>
+  <text x="485" y="82" text-anchor="middle" style="font-size:10px;fill:var(--muted)">truth + migrate</text>
+  <rect x="430" y="98" width="110" height="42" rx="7" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="485" y="118" text-anchor="middle" style="font-size:12px;fill:var(--fg)">redis</text>
+  <text x="485" y="133" text-anchor="middle" style="font-size:10px;fill:var(--muted)">cache·rate·usage</text>
+  <rect x="266" y="166" width="120" height="40" rx="7" fill="var(--should-bg)" stroke="var(--should)" stroke-width="1.5"/>
+  <text x="326" y="186" text-anchor="middle" style="font-size:12px;fill:var(--fg)">prometheus</text>
+  <text x="326" y="200" text-anchor="middle" style="font-size:10px;fill:var(--muted)">dns_sd, scrapes both</text>
+  <rect x="430" y="166" width="110" height="40" rx="7" fill="var(--should-bg)" stroke="var(--should)" stroke-width="1.5"/>
+  <text x="485" y="186" text-anchor="middle" style="font-size:12px;fill:var(--fg)">grafana</text>
+  <text x="485" y="200" text-anchor="middle" style="font-size:10px;fill:var(--muted)">2 dashboards</text>
+  <line x1="116" y1="83" x2="148" y2="83" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#c)"/>
+  <line x1="230" y1="79" x2="264" y2="65" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#c)"/>
+  <line x1="230" y1="87" x2="264" y2="103" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#c)"/>
+  <line x1="386" y1="62" x2="428" y2="64" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#c)"/>
+  <line x1="386" y1="104" x2="428" y2="116" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#c)"/>
+  <line x1="326" y1="122" x2="326" y2="164" stroke="var(--should)" stroke-width="1.5" marker-end="url(#c)"/>
+  <line x1="386" y1="186" x2="428" y2="186" stroke="var(--should)" stroke-width="1.5" marker-end="url(#c)"/>
+  <rect x="20" y="220" width="11" height="11" rx="2" fill="var(--accent-bg)" stroke="var(--accent)"/>
+  <text x="38" y="229" class="legend" style="font-size:11px">data plane</text>
+  <rect x="140" y="220" width="11" height="11" rx="2" fill="var(--should-bg)" stroke="var(--should)"/>
+  <text x="158" y="229" class="legend" style="font-size:11px">observability</text>
+  <rect x="280" y="220" width="11" height="11" rx="2" fill="var(--surface)" stroke="var(--border)"/>
+  <text x="298" y="229" class="legend" style="font-size:11px">durable / external</text>
+</svg>
+<table>
+  <thead><tr><th>Component</th><th>Its single job</th><th>Scales by</th></tr></thead>
+  <tbody>
+    <tr><td>nginx</td><td>single ingress; load-balance across replicas via Docker DNS round-robin; upstream keep-alive</td><td class="force">managed; tune workers/connections</td></tr>
+    <tr><td>keyservice ×2</td><td>the gate — validate + cache + rate-limit + quota + meter; <b>stateless</b></td><td class="force">add replicas (no sticky sessions)</td></tr>
+    <tr><td>Postgres</td><td>source of truth: tenants, api_keys, usage mirror</td><td class="force">off the hot path; read replicas later</td></tr>
+    <tr><td>Redis</td><td>L2 cache, token buckets, usage counters, revocation pub/sub</td><td class="force">bigger node → cluster</td></tr>
+    <tr><td>migrate</td><td>one-shot schema apply, then exits (gates keyservice startup)</td><td>—</td></tr>
+    <tr><td>Prometheus + Grafana</td><td>scrape both replicas directly (dns_sd); RED + per-tenant dashboards</td><td>managed</td></tr>
+  </tbody>
+</table>
+
+<h3>The /validate pipeline, stage by stage</h3>
+<table>
+  <thead><tr><th>#</th><th>Stage</th><th>Does</th><th>On failure</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Parse</td><td>extract <code>Bearer</code> key</td><td>400 if missing/garbage</td></tr>
+    <tr><td>2</td><td>Hash</td><td>HMAC-SHA256 + pepper → 32-byte index</td><td>—</td></tr>
+    <tr><td>3</td><td>L1</td><td>in-process map (RAM)</td><td>miss → fall to L2</td></tr>
+    <tr><td>4</td><td>L2</td><td>Redis JSON; backfill L1 on hit</td><td class="force">Redis error → treat as miss (fall to PG)</td></tr>
+    <tr><td>5</td><td>Postgres</td><td>one JOIN (key + tenant active); write-through both tiers</td><td class="force">real DB error → 500 (not cached)</td></tr>
+    <tr><td>6</td><td>Verdict</td><td>invalid → <b>401</b> (fail closed, no reason leaked)</td><td class="force">negative-cached 30 s</td></tr>
+    <tr><td>7</td><td>Gate</td><td>one Lua call: rate + quota + meter</td><td class="force">Redis error → <b>fail open</b> (allow)</td></tr>
+    <tr><td>8</td><td>Respond</td><td>200 served+metered, or 429 rate/quota</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<h3>Deployment — small, static, ordered</h3>
+<p>A multi-stage build emits a static, symbol-stripped binary into a bare Alpine image running as a non-root user — ~22 MB versus ~800 MB single-stage. Manifests are copied before source so the dependency layer caches independently.</p>
+<div class="snip">
+  <div class="fname"><b>keyservice/Dockerfile</b> · multi-stage, ~22 MB</div>
+<pre><code>FROM golang:1.25-alpine AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download                       # cached unless deps change
+COPY . ./
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/keyservice .
+
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+RUN adduser -D -u 10001 appuser           # run unprivileged, not root
+USER appuser
+COPY --from=builder /out/keyservice /usr/local/bin/keyservice
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/keyservice"]</code></pre>
+</div>
+<p>nginx is the only published port. The <code>keepalive 32</code> pool only works because HTTP/1.1 is forced and the default <code>Connection: close</code> header is cleared — otherwise every request would open a fresh upstream socket.</p>
+<div class="snip">
+  <div class="fname"><b>infra/nginx.conf</b> · upstream keep-alive to a round-robined replica set</div>
+<pre><code>worker_processes auto;                    # one worker per CPU core
+events { worker_connections 4096; }       # 4× the default
+
+http {
+  upstream keyservice_backend {
+    server keyservice:8080;               # Docker DNS → all replicas, round-robin
+    keepalive 32;                         # idle-connection pool per worker
+  }
+  server {
+    listen 80;
+    location / {
+      proxy_pass http://keyservice_backend;
+      proxy_http_version 1.1;             # required for keep-alive…
+      proxy_set_header Connection "";     # …and clear the default 'close'
+    }
+  }
+}</code></pre>
+</div>
+<p>Compose wires two stateless replicas behind nginx, gated on healthy datastores <i>and</i> a completed one-shot migration — so schema is guaranteed present and migrations never race across replicas. Config is fully env-driven.</p>
+<div class="snip">
+  <div class="fname"><b>docker-compose.yml</b> · 2 replicas, gated startup, env-driven</div>
+<pre><code>keyservice:
+  build: ./keyservice
+  deploy: { replicas: 2 }                 # stateless → scale horizontally
+  expose: ["8080"]                         # internal only; nginx is the ingress
+  environment:
+    DATABASE_URL: "postgres://mint:mint_dev@postgres:5432/mint?sslmode=disable"
+    ADMIN_TOKEN:  "just-works-for-now"
+    KEY_PEPPER:   "dev-pepper-rotate-in-prod"
+    REDIS_URL:    "redis://redis:6379/0"
+    RATE_LIMIT:   "${RATE_LIMIT:-100}"     # tokens/sec
+    RATE_BURST:   "${RATE_BURST:-200}"     # bucket capacity
+    FLUSH_INTERVAL: "${FLUSH_INTERVAL:-30s}"
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis:    { condition: service_healthy }
+    migrate:  { condition: service_completed_successfully }   # schema first</code></pre>
+</div>
+
+<h2 class="section"><span class="num">4.</span> API contract &amp; data model</h2>
+
+<h3>The hot-path contract</h3>
+<p>One endpoint carries all the load. The key rides in a standard <code>Bearer</code> header; the response is a tiny JSON verdict. Status codes are carefully distinct so a caller can tell <i>wrong key</i> from <i>too many requests</i>.</p>
+<pre><code>POST /v1/validate
+Authorization: Bearer ak_live_8sK2pX9q...
+
+200 OK    { "valid": true, "tenant_id": "…", "key_id": "…" }   <span class="c"># served + metered</span>
+401       { "valid": false }                                    <span class="c"># unknown / revoked / suspended — no reason leaked</span>
+429       { "valid": true, "error": "rate limit exceeded" }     <span class="c"># valid key, over burst</span>
+429       { "valid": true, "error": "monthly quota exceeded" }  <span class="c"># valid key, over quota</span></code></pre>
+<table>
+  <thead><tr><th>Status</th><th>When</th><th>Policy</th></tr></thead>
+  <tbody>
+    <tr><td>200</td><td>valid key, within limits</td><td>served, usage incremented</td></tr>
+    <tr><td>400</td><td>missing / malformed Bearer header</td><td>reject at parse</td></tr>
+    <tr><td>401</td><td>unknown, revoked, or suspended tenant</td><td class="force">fail closed, quiet</td></tr>
+    <tr><td>429</td><td>over rate limit OR over monthly quota</td><td class="force">distinct error strings; 429 ≠ 401</td></tr>
+    <tr><td>500</td><td>real Postgres error</td><td class="force">not cached</td></tr>
+  </tbody>
+</table>
+<p class="note">Admin endpoints (create tenant, issue key, revoke key, read usage) sit behind an <code>X-Admin-Token</code> header compared in constant time.</p>
+
+<h3>Data model</h3>
+<p>A small normalised schema in Postgres. <code>api_keys → tenants</code> is <code>ON DELETE RESTRICT</code> (you can't delete a tenant that still holds keys — protects the audit trail); <code>usage_counters → tenants</code> is <code>ON DELETE CASCADE</code> (usage is derived data, safe to drop). The hashed key column is <code>UNIQUE</code> — that constraint <i>is</i> the validate lookup index.</p>
+<svg viewBox="0 0 700 330" role="img" aria-label="ER diagram: tenants has many api_keys and many usage_counters">
+  <rect x="40" y="120" width="180" height="120" rx="7" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="52" y="142" style="font-size:13px;fill:var(--accent)">tenants</text>
+  <line x1="40" y1="150" x2="220" y2="150" stroke="var(--border)"/>
+  <text x="52" y="170" style="font-size:11px;fill:var(--fg)">id  (pk, uuid)</text>
+  <text x="52" y="188" style="font-size:11px;fill:var(--fg)">name</text>
+  <text x="52" y="206" style="font-size:11px;fill:var(--fg)">status  (active/suspended/…)</text>
+  <text x="52" y="224" style="font-size:11px;fill:var(--fg)">monthly_quota  (null = ∞)</text>
+  <rect x="320" y="40" width="240" height="150" rx="7" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="332" y="62" style="font-size:13px;fill:var(--accent)">api_keys</text>
+  <line x1="320" y1="70" x2="560" y2="70" stroke="var(--border)"/>
+  <text x="332" y="90" style="font-size:11px;fill:var(--fg)">id  (pk, uuid)</text>
+  <text x="332" y="108" style="font-size:11px;fill:var(--muted)">tenant_id  (fk → RESTRICT)</text>
+  <text x="332" y="126" style="font-size:11px;fill:var(--fg)">key_prefix</text>
+  <text x="332" y="144" style="font-size:11px;fill:var(--fg)">key_hash  BYTEA UNIQUE  ← index</text>
+  <text x="332" y="162" style="font-size:11px;fill:var(--fg)">status  (active/revoked)</text>
+  <text x="332" y="180" style="font-size:11px;fill:var(--fg)">revoked_at · created_at</text>
+  <rect x="320" y="222" width="240" height="92" rx="7" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="332" y="244" style="font-size:13px;fill:var(--accent)">usage_counters</text>
+  <line x1="320" y1="252" x2="560" y2="252" stroke="var(--border)"/>
+  <text x="332" y="272" style="font-size:11px;fill:var(--muted)">tenant_id  (fk → CASCADE)</text>
+  <text x="332" y="290" style="font-size:11px;fill:var(--fg)">period  (YYYY-MM)   pk (tenant, period)</text>
+  <text x="332" y="308" style="font-size:11px;fill:var(--fg)">count  (mirrored from Redis)</text>
+  <line x1="220" y1="150" x2="320" y2="110" stroke="var(--muted)" stroke-width="1.5"/>
+  <text x="228" y="138" style="font-size:12px;fill:var(--muted)">1</text>
+  <text x="306" y="104" style="font-size:13px;fill:var(--muted)">∞</text>
+  <line x1="220" y1="200" x2="320" y2="262" stroke="var(--muted)" stroke-width="1.5"/>
+  <text x="228" y="216" style="font-size:12px;fill:var(--muted)">1</text>
+  <text x="306" y="266" style="font-size:13px;fill:var(--muted)">∞</text>
+</svg>
+<div class="snip">
+  <div class="fname"><b>keyservice/migrations/0002_create_api_keys.up.sql</b></div>
+<pre><code>CREATE TABLE api_keys (
+    id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id     UUID        NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+    name          TEXT        NOT NULL,
+    key_prefix    TEXT        NOT NULL,
+    key_hash      BYTEA       NOT NULL UNIQUE,          -- the /validate lookup index
+    status        TEXT        NOT NULL DEFAULT 'active'
+                              CHECK (status IN ('active', 'revoked')),
+    last_used_at  TIMESTAMPTZ NULL,
+    revoked_at    TIMESTAMPTZ NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_api_keys_tenant_id ON api_keys (tenant_id);</code></pre>
+</div>
+<p>Validation is a <b>single JOIN</b> requiring <code>status='active'</code> on <i>both</i> tables, so a revoked key or a suspended tenant both collapse to zero rows — no fetch-then-check, no second query, no TOCTOU window. Every miss returns the one sentinel <code>ErrKeyNotValid</code>, so nothing leaks about <i>why</i>.</p>
+<div class="snip">
+  <div class="fname"><b>keyservice/internal/store/store.go</b> · ValidateKey — one JOIN, fail-closed</div>
+<pre><code>func (s *Store) ValidateKey(ctx context.Context, keyHash []byte) (ValidatedKey, error) {
+	var vk ValidatedKey
+	err := s.pool.QueryRow(ctx,
+		`SELECT k.id, k.tenant_id, COALESCE(t.monthly_quota,0)
+		FROM api_keys k
+		JOIN tenants t ON t.id = k.tenant_id
+		WHERE k.key_hash = $1
+		AND k.status = 'active'
+		AND t.status = 'active'`, keyHash).Scan(&amp;vk.KeyID, &amp;vk.TenantID, &amp;vk.MonthlyQuota)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ValidatedKey{}, ErrKeyNotValid      // any miss → one quiet sentinel
+		}
+		return ValidatedKey{}, err
+	}
+	return vk, nil
+}</code></pre>
+</div>
+<p class="note">The quota rides in the same SELECT (<code>COALESCE(monthly_quota,0)</code>), so it travels into the cache entry and the per-request quota check needs no extra lookup.</p>
+
+<h2 class="section"><span class="num">5.</span> Component deep dives</h2>
+
+<h3>5.1 Keys — unguessable, cheap, hash-only</h3>
+<p>Keys are drawn from the OS CSPRNG with <b>rejection sampling</b> to avoid modulo bias (a raw byte is 0–255; 256 isn't a multiple of 62, so the low residues would be slightly over-represented — dropping bytes ≥ 248 fixes it). 32 base62 chars ≈ 190 bits of entropy. Only the HMAC digest is stored.</p>
+<div class="snip">
+  <div class="fname"><b>keyservice/internal/keys/keys.go</b></div>
+<pre><code>func Generate() (string, error) {
+	const bodyLen = 32
+	const maxByte = 62 * 4 // 248 — largest multiple of 62 that fits in a byte
+	out := make([]byte, bodyLen)
+	buf := make([]byte, 1)
+	for i := 0; i &lt; bodyLen; {
+		if _, err := rand.Read(buf); err != nil {       // crypto/rand — OS CSPRNG
+			return "", err
+		}
+		if buf[0] &gt;= maxByte {                            // rejection sampling
+			continue
+		}
+		out[i] = alphabet[buf[0]%62]
+		i++
+	}
+	return "ak_live_" + string(out), nil
+}
+
+// Hash returns HMAC-SHA256(pepper, key) — 32 raw bytes for the BYTEA column.
+func Hash(pepper, key string) []byte {
+	mac := hmac.New(sha256.New, []byte(pepper))
+	mac.Write([]byte(key))
+	return mac.Sum(nil)
+}</code></pre>
+</div>
+
+<h3>5.2 The cache — L1 + L2 + pub/sub invalidation</h3>
+<div class="concept">
+  <span class="lab">Concept · multi-level read-through cache</span>
+  <p><b>L1</b> is a per-replica Go map (RAM, ~0.2 ms, no network). <b>L2</b> is shared Redis (absorbs cross-replica and cold-start misses). <b>Postgres</b> is the last resort. A miss writes the answer back through both tiers (<b>write-through</b>); an L2 hit backfills L1 so the next read stays in-process.</p>
+</div>
+<p>L1 is a map guarded by a <code>sync.RWMutex</code> with lazy per-entry expiry — readers take the shared lock, expiry is checked on read rather than by a background sweeper, keeping the hot path lock-light.</p>
+<div class="snip">
+  <div class="fname"><b>keyservice/internal/cache/cache.go</b> · L1 in-process cache</div>
+<pre><code>type Cache struct {
+	mu   sync.RWMutex
+	data map[string]entry
+}
+func (c *Cache) Get(key string) (any, bool) {
+	c.mu.RLock()
+	e, ok := c.data[key]
+	c.mu.RUnlock()
+	if !ok || time.Now().After(e.expiresAt) {     // lazy TTL: expired = miss
+		return nil, false
+	}
+	return e.value, true
+}
+func (c *Cache) Set(key string, value any, ttl time.Duration) {
+	c.mu.Lock()
+	c.data[key] = entry{value: value, expiresAt: time.Now().Add(ttl)}
+	c.mu.Unlock()
+}</code></pre>
+</div>
+<p>The tiered read lives in the validate handler. <b>Negative caching</b> stores invalid verdicts too (short 30 s TTL vs 5 min for valid) so a bad-key flood can't hammer Postgres — but a <i>real</i> DB error is never cached.</p>
+<div class="snip">
+  <div class="fname"><b>keyservice/internal/api/api.go</b> · the three-tier read in /validate</div>
+<pre><code>// --- L1: in-process ---
+if v, hit := s.cache.Get(cacheKey); hit {
+	s.l1Hits.Add(1)
+	s.writeValidateResult(w, r, cacheKey, v.(cache.Result))
+	return
+}
+// --- L2: Redis ---
+if res, hit := s.l2.Get(ctx, cacheKey); hit {
+	s.l2Hits.Add(1)
+	s.cache.Set(cacheKey, res, ttlFor(res))        // backfill L1
+	s.writeValidateResult(w, r, cacheKey, res)
+	return
+}
+// --- L3: Postgres (source of truth) ---
+s.misses.Add(1)
+vk, err := s.store.ValidateKey(ctx, keyHash)
+var res cache.Result
+if err != nil {
+	if !errors.Is(err, store.ErrKeyNotValid) {
+		writeJSONError(w, http.StatusInternalServerError, "internal error")
+		return                                       // real DB error → don't cache
+	}
+	res = cache.Result{Valid: false}                 // negative cache (short TTL)
+} else {
+	res = cache.Result{Valid: true, TenantID: vk.TenantID, KeyID: vk.KeyID, MonthlyQuota: vk.MonthlyQuota}
+}
+s.cache.Set(cacheKey, res, ttlFor(res))          // write-through to both tiers
+s.l2.Set(ctx, cacheKey, res, ttlFor(res))</code></pre>
+</div>
+<div class="concept">
+  <span class="lab">Concept · the multi-replica staleness hole + pub/sub fix</span>
+  <p>Each replica holds its <i>own</i> L1, so a revoke on one replica would leave the others serving a stale "valid" for up to the TTL. Revoke does <b>UPDATE Postgres → DELETE L2 → PUBLISH the key hash</b> on a <code>revocations</code> channel; every replica's subscriber goroutine evicts that hash from its own L1 within milliseconds. TTL is the backstop if a message is missed.</p>
+</div>
+<div class="snip">
+  <div class="fname"><b>keyservice/internal/cache/invalidation.go</b> · fleet-wide eviction</div>
+<pre><code>func PublishRevocation(ctx context.Context, rdb *redis.Client, keyHash string) error {
+	return rdb.Publish(ctx, RevocationChannel, keyHash).Err()
+}
+// SubscribeRevocations runs forever per replica, evicting each hash from local L1.
+func SubscribeRevocations(ctx context.Context, rdb *redis.Client, l1 *Cache) {
+	sub := rdb.Subscribe(ctx, RevocationChannel)
+	defer sub.Close()
+	for msg := range sub.Channel() {
+		l1.Delete(msg.Payload)
+	}
+}</code></pre>
+</div>
+
+<h3>5.3 The gate — rate-limit + quota + meter in one atomic call</h3>
+<p>This is the heart of the hot path. A single Lua script — embedded into the binary and sent as a SHA via <code>EVALSHA</code> — refills a token bucket from elapsed time, then returns a 3-way verdict: <code>0</code> rate-limited, <code>2</code> quota-exceeded, or <code>1</code> allowed (spend a token, INCR usage). Only served requests are metered. There's no background timer — tokens accrue lazily per call, so idle buckets cost nothing and self-expire.</p>
+<div class="snip">
+  <div class="fname"><b>keyservice/internal/ratelimit/bucket.lua</b> · the 3-way verdict</div>
+<pre><code>-- refill: add tokens for the time elapsed, capped at capacity
+local elapsed = math.max(0, now - ts)
+tokens = math.min(capacity, tokens + elapsed * rate)
+
+local status
+if tokens &lt; 1 then
+	status = 0                                       -- RATE_LIMITED
+else
+	local used = tonumber(redis.call("GET", usageKey)) or 0
+	if quota &gt; 0 and used &gt;= quota then
+		status = 2                                   -- QUOTA_EXCEEDED
+	else
+		tokens = tokens - 1
+		local newused = redis.call("INCR", usageKey)
+		if newused == 1 then
+			redis.call("EXPIRE", usageKey, usage_ttl)
+		end
+		status = 1                                   -- ALLOWED + metered
+	end
+end
+redis.call("HSET", bucketKey, "tokens", tokens, "ts", ts)
+redis.call("EXPIRE", bucketKey, math.ceil(capacity / rate) + 1)  -- idle buckets self-clean
+return status</code></pre>
+</div>
+<p>The Go wrapper computes the per-month usage key and its TTL (time to month-end + 48 h grace, so the flusher can mirror the final value before Redis drops it), runs the script in one round-trip, and — critically — <b>fails open</b>: any Redis error returns <code>Allowed</code>.</p>
+<div class="snip">
+  <div class="fname"><b>keyservice/internal/ratelimit/ratelimit.go</b> · Check — one round-trip, fails open</div>
+<pre><code>res, err := l.script.Run(ctx, rdb,
+	[]string{"ratelimit:" + keyHash, usageKey},      // KEYS[1], KEYS[2]
+	l.rate, l.capacity, nowSec, quota, usageTTL,     // ARGV[1..5]
+).Int()
+if err != nil {
+	return Allowed                                   // fail OPEN — availability > strictness
+}
+switch res {
+case 0:  return RateLimited
+case 2:  return QuotaExceeded
+default: return Allowed
+}</code></pre>
+</div>
+
+<h3>5.4 The flusher — write-coalescing to Postgres</h3>
+<p>The hot path never writes to Postgres. Usage lives as Redis counters; a background flusher mirrors them on an interval. Only the replica that wins a self-expiring <b>leader lease</b> flushes that round — but correctness doesn't depend on the lease, because the UPSERT is <b>idempotent</b>.</p>
+<svg viewBox="0 0 700 200" role="img" aria-label="Write coalescing: hot path INCRs Redis; a leader replica periodically SCANs, MGETs, and batch-UPSERTs to Postgres">
+  <defs><marker id="d" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/></marker></defs>
+  <rect x="20" y="40" width="150" height="50" rx="7" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="95" y="62" text-anchor="middle" style="font-size:12px;fill:var(--fg)">hot path ×N</text>
+  <text x="95" y="78" text-anchor="middle" style="font-size:10px;fill:var(--muted)">INCR usage:&lt;period&gt;:&lt;tenant&gt;</text>
+  <rect x="250" y="40" width="120" height="50" rx="7" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="310" y="62" text-anchor="middle" style="font-size:12px;fill:var(--fg)">redis counters</text>
+  <text x="310" y="78" text-anchor="middle" style="font-size:10px;fill:var(--muted)">0 PG writes here</text>
+  <rect x="250" y="128" width="120" height="52" rx="7" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="310" y="150" text-anchor="middle" style="font-size:12px;fill:var(--fg)">flusher (leader)</text>
+  <text x="310" y="165" text-anchor="middle" style="font-size:10px;fill:var(--muted)">SCAN · MGET · batch</text>
+  <rect x="470" y="128" width="150" height="52" rx="7" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"/>
+  <text x="545" y="150" text-anchor="middle" style="font-size:12px;fill:var(--fg)">postgres</text>
+  <text x="545" y="165" text-anchor="middle" style="font-size:10px;fill:var(--muted)">~10 writes/s · invariant</text>
+  <line x1="170" y1="65" x2="248" y2="65" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#d)"/>
+  <line x1="310" y1="90" x2="310" y2="126" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#d)"/>
+  <text x="318" y="112" style="font-size:10px;fill:var(--muted)">every FLUSH_INTERVAL</text>
+  <line x1="370" y1="154" x2="468" y2="154" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#d)"/>
+  <text x="419" y="146" text-anchor="middle" style="font-size:10px;fill:var(--muted)">one UPSERT</text>
+</svg>
+<div class="snip">
+  <div class="fname"><b>keyservice/internal/usage/flusher.go</b> · SCAN (never KEYS) → MGET → one batch</div>
+<pre><code>var keys []string
+iter := f.rdb.Scan(ctx, 0, Prefix+"*", 100).Iterator()   // non-blocking cursor
+for iter.Next(ctx) { keys = append(keys, iter.Val()) }
+...
+vals, err := f.rdb.MGet(ctx, keys...).Result()           // all counts, one round-trip
+var rows []store.Usage
+for i, key := range keys {
+	if vals[i] == nil { continue }                       // key expired between SCAN and MGET
+	period, tenantID, ok := ParseKey(key)
+	count, _ := toInt64(vals[i])
+	rows = append(rows, store.Usage{TenantID: tenantID, Period: period, Count: count})
+}
+return len(rows), f.store.UpsertUsage(ctx, rows)         // one batched UPSERT</code></pre>
+</div>
+<div class="snip">
+  <div class="fname"><b>keyservice/internal/store/store.go</b> · idempotent absolute-value mirror</div>
+<pre><code>batch.Queue(
+	`INSERT INTO usage_counters (tenant_id, period, count, updated_at)
+	 VALUES ($1, $2, $3, now())
+	 ON CONFLICT (tenant_id, period)
+	 DO UPDATE SET count = EXCLUDED.count, updated_at = now()`,   // absolute, not delta
+	u.TenantID, u.Period, u.Count,
+)</code></pre>
+</div>
+<p class="note">Because the flusher writes the live total (not a delta), re-running is a no-op — which is what makes the leader lease an <i>optimization</i> (it suppresses duplicate work), not a correctness requirement.</p>
+
+<h3>5.5 Observability — RED without per-handler boilerplate</h3>
+<p>One middleware wraps the whole mux and records rate/errors/duration for every route uniformly. A <code>statusRecorder</code> captures the status code the stdlib otherwise swallows, and <code>routeLabel</code> uses the matched route <i>template</i> (<code>r.Pattern</code>) so <code>/v1/tenants/{id}/usage</code> is one Prometheus series, not one per UUID — the cardinality trap, avoided.</p>
+<div class="snip">
+  <div class="fname"><b>keyservice/internal/api/metrics.go</b> · RED middleware + bounded labels</div>
+<pre><code>func metricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rec := &amp;statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		route := routeLabel(r)                           // r.Pattern → bounded cardinality
+		httpRequests.WithLabelValues(r.Method, route, strconv.Itoa(rec.status)).Inc()
+		httpDuration.WithLabelValues(r.Method, route).Observe(time.Since(start).Seconds())
+	})
+}</code></pre>
+</div>
+<p class="note">Readiness (<code>/readyz</code>) pings Postgres + Redis under an 800 ms timeout and returns 503 to pull the replica from rotation — distinct from liveness (<code>/healthz</code>). Prometheus scrapes both replicas directly via <code>dns_sd</code> so their counters aren't blended. Logs are slog JSON, with the stdlib <code>log</code> package bridged through it.</p>
+
+<h2 class="section"><span class="num">6.</span> The client SDK, the consumer &amp; end-to-end tests</h2>
+
+<div class="concept">
+  <span class="lab">Concept · error ≠ verdict</span>
+  <p>The SDK's <code>Validate</code> returns an <code>error</code> <b>only</b> on transport failure (Mint unreachable). Mint's actual decision — allowed / invalid / rate-limited / quota-exceeded — rides back in an <code>Outcome</code> enum. That split is precisely what lets the middleware <b>fail closed on an outage</b> (503) while still mapping a genuine "invalid key" to 401.</p>
+</div>
+<div class="snip">
+  <div class="fname"><b>keyservice-go/client.go</b> · status → Outcome (stdlib-only module)</div>
+<pre><code>switch resp.StatusCode {
+case http.StatusOK:
+	return Result{Outcome: Allowed, TenantID: body.TenantID, KeyID: body.KeyID}, nil
+case http.StatusUnauthorized, http.StatusBadRequest:
+	return Result{Outcome: Invalid}, nil
+case http.StatusTooManyRequests:
+	if strings.Contains(body.Error, "quota") {           // 429 is ambiguous…
+		return Result{Outcome: QuotaExceeded}, nil       // …body disambiguates
+	}
+	return Result{Outcome: RateLimited}, nil
+default:
+	return Result{}, fmt.Errorf("keyservice: unexpected status %d", resp.StatusCode)
+}</code></pre>
+</div>
+<div class="snip">
+  <div class="fname"><b>keyservice-go/middleware.go</b> · the one-line gate, fail-closed by default</div>
+<pre><code>res, err := c.Validate(r.Context(), key)
+if err != nil {                                          // couldn't reach Mint
+	if c.failOpen {
+		next.ServeHTTP(w, r)                             // explicit opt-in
+		return
+	}
+	writeErr(w, http.StatusServiceUnavailable, "auth unavailable")   // fail closed
+	return
+}
+switch res.Outcome {
+case Allowed:
+	ctx := context.WithValue(r.Context(), tenantKey, res.TenantID)
+	ctx = context.WithValue(ctx, keyIDKey, res.KeyID)
+	next.ServeHTTP(w, r.WithContext(ctx))                // inject identity, call handler
+case RateLimited:   writeErr(w, http.StatusTooManyRequests, "rate limit exceeded")
+case QuotaExceeded: writeErr(w, http.StatusTooManyRequests, "monthly quota exceeded")
+default:            writeErr(w, http.StatusUnauthorized, "invalid api key")
+}</code></pre>
+</div>
+<p>A consumer gets all of that — auth, rate-limit, quota, identity injection — by wrapping its router once. The demo product (a stock-price API) is the proof: no security code in any handler.</p>
+<div class="snip">
+  <div class="fname"><b>demo/product/product.go</b> · integrate in one line</div>
+<pre><code>func Handler(client *keysvc.Client) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v1/price/{symbol}", price)
+	mux.HandleFunc("GET /v1/whoami", whoami)
+	return client.Middleware(mux)            // ← gates EVERY route above
+}</code></pre>
+</div>
+
+<h3>End-to-end verdict matrix</h3>
+<p>An integration suite drives the full chain (demo product → SDK middleware → real Mint → Postgres/Redis) and asserts one row of the truth table per test. It runs two ways behind one <code>mintEnv(t)</code> seam — <b>testcontainers</b> by default (hermetic, spins the stack itself) or <code>-tags live</code> against a running stack. All seven pass in both modes.</p>
+<table>
+  <thead><tr><th>Scenario</th><th>Expect</th><th>Proves</th></tr></thead>
+  <tbody>
+    <tr><td>valid key</td><td>200 + tenant echoed</td><td>auth · cache · context injection</td></tr>
+    <tr><td>missing / garbage key</td><td>401</td><td>fail-closed auth</td></tr>
+    <tr><td>revoked key</td><td>401 (after poll)</td><td>pub/sub invalidation, eventually consistent</td></tr>
+    <tr><td>over quota</td><td>429 (exactly N served)</td><td>quota counter + meter</td></tr>
+    <tr><td>over rate limit</td><td>429</td><td>token bucket</td></tr>
+    <tr><td>Mint unreachable</td><td>503</td><td>fail-closed on transport error</td></tr>
+  </tbody>
+</table>
+<div class="snip">
+  <div class="fname"><b>integration/matrix_test.go</b> · the quota row — asserts the EXACT cap</div>
+<pre><code>quota := int64(5)
+tid := createTenant(t, mint, "quota", &amp;quota)
+_, key := issueKey(t, mint, tid)
+
+allowed, quotaHit := 0, 0
+for i := 0; i &lt; int(quota)+5; i++ {
+	status, body := get(t, prod, key)        // sequential: stays under the rate limit
+	switch {
+	case status == http.StatusOK:
+		allowed++
+	case status == http.StatusTooManyRequests &amp;&amp; strings.Contains(body, "quota"):
+		quotaHit++
+	}
+}
+if allowed != int(quota) { t.Fatalf("quota: want exactly %d allowed, got %d", quota, allowed) }</code></pre>
+</div>
+
+<h2 class="section"><span class="num">7.</span> Results</h2>
+<div class="locked">
+  <h3>What was measured (reproducible from <code>benchmarks/</code>)</h3>
+  <ul>
+    <li><b>Cache before/after</b> (<code>hey -n 100000 -c 50</code>): 12,018 → <b>18,292 rps</b> (+52%); p99 17 → <b>10 ms</b> (−41%); p50 3.2 → 2.2 ms. p99 is inside the 20 ms SLO.</li>
+    <li><b>Cache hit rate</b> (Go loadgen, cold start, Zipf, 5% invalid): <b>99.7%</b> @ 1k keys, 96.7% @ 10k keys over 300k requests — misses ≈ one per unique key.</li>
+    <li><b>Write reduction</b>: ~10 Postgres writes/s = <code>tenants / flush_interval</code>, invariant to load. <b>376×</b> end-to-end, <b>500×</b> metering-isolated, durable mirror lossless at 600,000.</li>
+    <li><b>Image</b>: ~22 MB multi-stage. <b>Failure modes</b>: auth fail-closed and rate-limit fail-open both verified by the integration suite.</li>
+    <li><b>Honesty</b>: the ≥30k rps throughput target was <i>not</i> met on a shared laptop (18k real) — reported as-is; it needs dedicated hardware, and the before/after delta is the reliable signal.</li>
+  </ul>
+</div>
+
+<p class="note" style="margin-top:2rem">Every code excerpt above is copied verbatim from the repository. The full sources live under <code>keyservice/</code> (server), <code>keyservice-go/</code> (SDK), <code>demo/</code> (consumer), and <code>integration/</code> (tests); the build log and concept glossary are in <a href="design.html" style="color:var(--accent)">design.html</a>.</p>
+
+</div>
+</body>
+</html>
