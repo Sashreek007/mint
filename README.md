@@ -17,13 +17,22 @@ Every backend re-implements the same boring, security-critical plumbing: check t
 
 It's a **stateless Go service behind nginx**, scaled horizontally across replicas, with an asymmetric failure mode by design: **auth fails closed** (any doubt → reject; security first) while **rate-limiting fails open** (Redis down → allow; availability first).
 
-The performance comes from three ideas, all visible in the diagram above:
+## High-level design
 
-- **A three-tier read path** — in-process **L1** (per replica) → shared Redis **L2** → Postgres. A revoke is broadcast over Redis pub/sub so every replica evicts its L1 within milliseconds.
-- **One atomic Lua gate** — rate-limit + monthly-quota check + usage `INCR` ride a *single* Redis round-trip.
-- **Write coalescing** — usage lives as a Redis counter; a background flusher batches it to Postgres, collapsing thousands of metering writes/sec into ~10/sec.
+Mint is a **stateless data plane** behind a load balancer, with **Redis as the hot-path accelerator** and **Postgres as the durable source of truth**. A `/validate` request is hashed, resolved through the cache tiers, then run through a single atomic gate — Postgres is touched only on a cache miss.
 
-**→ [Full system design](https://docs-navy-tau.vercel.app/mint-system-design.html)** — architecture, the `/validate` pipeline stage-by-stage, every component with the real code, and the measured numbers.
+- **nginx — ingress & load balancer.** The one published entry point; round-robins across the stateless `keyservice` replicas via Docker DNS, with upstream HTTP keep-alive so each worker reuses a pooled connection instead of paying a TCP handshake per request.
+- **keyservice — the gate (stateless, ×N).** The Go service every request flows through. It hashes the key (HMAC-SHA256 + a server-side pepper — microsecond-cheap, unlike a password KDF), resolves it through the cache tiers, then runs the rate-limit + quota + metering gate. Holding no local state, it scales horizontally with no coordination.
+- **L1 — in-process cache (per replica).** A Go map with per-entry TTL behind an `RWMutex`; a hit is answered from RAM with zero network hops (~0.2 ms). Each replica has its own L1, so a revoke is broadcast over Redis pub/sub and every replica evicts the key within milliseconds.
+- **L2 — Redis cache (shared).** JSON validation results shared across all replicas; absorbs cross-replica and cold-start misses and backfills L1 on a hit. Fail-soft — a Redis error degrades to a Postgres read, never a request failure.
+- **Redis — hot-path accelerator.** Beyond L2 it holds the per-key **token buckets** (rate limiting), per-tenant **usage counters** (quota + metering), and the **revocation pub/sub** channel. Rate-limit + quota check + usage `INCR` run together in **one atomic Lua script** — a single round-trip on the hot path.
+- **Postgres — source of truth.** The durable store for tenants, API keys (only the HMAC hash, never the plaintext), and the usage mirror. It sits **off the hot path** — reached only on a cache miss (one indexed JOIN of key + tenant) and by the background flusher.
+- **Usage flusher — write coalescing.** A background goroutine; a single leader (elected via a self-expiring Redis lease) periodically `SCAN`s the Redis usage counters and batch-`UPSERT`s them to Postgres, collapsing thousands of metering writes/sec into ~10/sec. The UPSERT mirrors the absolute value, so it is idempotent — a double-flush can't corrupt the count.
+- **keyservice-go — the client SDK.** A stdlib-only library a consumer imports; `client.Middleware(mux)` gates every route in one line, maps Mint's verdict to `200 / 401 / 429`, and **fails closed** (`503`) if Mint is unreachable.
+- **Observability — Prometheus + Grafana.** Prometheus scrapes each replica directly (DNS service discovery) for RED metrics plus cache/flush/reject counters; two pre-provisioned Grafana dashboards cover service health (Prometheus) and per-tenant quotas (a Postgres datasource).
+- **migrate — one-shot schema.** Applies migrations once at startup and exits; the replicas gate on its success, so schema is guaranteed present and migrations never race across replicas.
+
+**→ [Full system design](https://docs-navy-tau.vercel.app/mint-system-design.html)** — the request lifecycle stage-by-stage, each component's internals with the real code, the trade-off decisions, and the measured numbers.
 
 ## Integrate in one line
 
