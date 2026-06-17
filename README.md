@@ -23,7 +23,7 @@ The performance comes from three ideas, all visible in the diagram above:
 - **One atomic Lua gate** — rate-limit + monthly-quota check + usage `INCR` ride a *single* Redis round-trip.
 - **Write coalescing** — usage lives as a Redis counter; a background flusher batches it to Postgres, collapsing thousands of metering writes/sec into ~10/sec.
 
-**→ [Full system design](docs/mint-system-design.html)** — architecture, the `/validate` pipeline stage-by-stage, every component with the real code, and the measured numbers.
+**→ [Full system design](https://docs-navy-tau.vercel.app/mint-system-design.html)** — architecture, the `/validate` pipeline stage-by-stage, every component with the real code, and the measured numbers.
 
 ## Integrate in one line
 
@@ -145,5 +145,5 @@ cd benchmarks/realistic_load && go run . -duration 2m
 
 **Stack:** Go 1.25 (stdlib-first; `pgx/v5`) · Postgres 16 · Redis 7 · nginx · Docker Compose · Prometheus + Grafana.
 
-**Docs (interactive HTML, open locally):**
-[System design](docs/mint-system-design.html) · [Build log & glossary](docs/design.html) · [Demo walkthrough](docs/demo.html) · [Benchmark results](benchmarks/RESULTS.md).
+**Docs (live):**
+[System design](https://docs-navy-tau.vercel.app/mint-system-design.html) · [Build log & glossary](https://docs-navy-tau.vercel.app/design.html) · [Demo walkthrough](https://docs-navy-tau.vercel.app/demo.html) · [Benchmark results](benchmarks/RESULTS.md).
