@@ -8,6 +8,9 @@
 ![Docker Compose](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)
 ![image ~22MB](https://img.shields.io/badge/image-~22MB-2ea44f)
 ![p99 10ms](https://img.shields.io/badge/validate%20p99-10ms-2ea44f)
+![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f)
+
+*Status: portfolio / learning project — feature-complete through the validate · rate-limit · quota · metering pipeline; benchmarked on a laptop, not run in production.*
 
 ![Mint architecture](docs/mint.excalidraw.png)
 
@@ -87,7 +90,9 @@ The design and optimization choices behind the numbers above:
 
 ## Quick start
 
-Requires Docker. This brings up nginx + 2 keyservice replicas + Postgres + Redis + Prometheus + Grafana + the demo product:
+**Prerequisites:** Docker + Docker Compose run the stack. The demo, tests, and benchmarks additionally use `jq`, **Go 1.25+**, and [`hey`](https://github.com/rakyll/hey) (`brew install jq hey`); `psql` runs inside the Postgres container, so nothing extra is needed for it.
+
+Bring up the full stack — nginx + 2 keyservice replicas + Postgres + Redis + Prometheus + Grafana + the demo product:
 
 ```bash
 docker compose up -d --build
@@ -106,9 +111,10 @@ KEY=$(curl -s -XPOST localhost:8080/v1/tenants/$TID/keys \
   -H 'X-Admin-Token: just-works-for-now' -H 'content-type: application/json' \
   -d '{"name":"laptop"}' | jq -r .key)
 
-# burst it: a few hundred allowed (the bucket), the rest rate-limited
+# send a burst — a few hundred allowed (the burst bucket), the rest rate-limited
 cd demo && go run ./cmd/burst -key "$KEY" -n 2000 -c 50
-#  allowed=327  rate_limited=1673  quota_exceeded=0  invalid=0
+# example output:
+#  allowed=327  rate_limited=1673  quota_exceeded=0  invalid=0  unavailable=0  errors=0
 #  2000 requests in 1.6s = 1250 req/s
 ```
 
@@ -141,6 +147,23 @@ cd benchmarks/loadgen && go run . -keys 1000 -requests 300000 -concurrency 50
 cd benchmarks/realistic_load && go run . -duration 2m
 ```
 
+## Configuration
+
+All configuration is environment-driven (defaults from `docker-compose.yml`):
+
+| Variable | Default | Notes |
+|---|---|---|
+| `DATABASE_URL` | — | Postgres DSN (**required**) |
+| `REDIS_URL` | — | Redis URL (**required**) |
+| `ADMIN_TOKEN` | — | token for the admin endpoints (**required**) |
+| `KEY_PEPPER` | — | server-side HMAC pepper for key hashing (**required**) |
+| `RATE_LIMIT` | `100` | token-bucket refill — tokens/sec, per key |
+| `RATE_BURST` | `200` | token-bucket capacity (burst), per key |
+| `FLUSH_INTERVAL` | `30s` | usage-flush cadence (sets the Postgres write rate) |
+| `PREWARM_LIMIT` | `1000` | hot keys warmed into L1 at startup (`0` = cold start) |
+
+> `ADMIN_TOKEN` and `KEY_PEPPER` ship as **development placeholders** — set strong values (e.g. via a secret manager) before any non-local deployment. Rotating `KEY_PEPPER` invalidates all previously issued key hashes.
+
 ## Repo layout
 
 | Module | What it is |
@@ -169,3 +192,7 @@ cd benchmarks/realistic_load && go run . -duration 2m
 
 **Docs (live):**
 [System design](https://docs-navy-tau.vercel.app/mint-system-design.html) · [Build log & glossary](https://docs-navy-tau.vercel.app/design.html) · [Demo walkthrough](https://docs-navy-tau.vercel.app/demo.html) · [Benchmark results](benchmarks/RESULTS.md).
+
+## License
+
+MIT — see [LICENSE](LICENSE).
